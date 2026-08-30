@@ -145,5 +145,43 @@ class PostgresDataStore:
         ]
 
     def mutate(self, tool_name: str, args: dict[str, Any]) -> dict[str, Any]:
-        # Cloud actions are explicitly simulated. create_index is implemented in CP3.
-        return {"status": "executed", "backend": "simulated-cloud", "tool": tool_name, "args": args}
+        if tool_name == "create_index":
+            table = str(args["table"])
+            columns = [str(column) for column in args["columns"]]
+            if (
+                not _IDENTIFIER.fullmatch(table)
+                or not columns
+                or not all(_IDENTIFIER.fullmatch(column) for column in columns)
+            ):
+                raise ValueError("Invalid table or column identifier")
+            index_name = f"{table}_{'_'.join(columns)}_idx"
+            concurrently = "CONCURRENTLY " if args.get("concurrently", True) else ""
+            with psycopg.connect(self.database_url, autocommit=True) as connection:
+                connection.execute(
+                    f"CREATE INDEX {concurrently}IF NOT EXISTS {index_name} "
+                    f"ON {table} ({', '.join(columns)})"
+                )
+            return {"status": "executed", "backend": "postgres", "index": index_name}
+
+        service = str(args["service"])
+        with self.connection(read_only=False) as connection:
+            if tool_name == "increase_connection_pool":
+                connection.execute(
+                    "UPDATE service_state SET connection_pool_size = %s, updated_at = now() "
+                    "WHERE service = %s",
+                    (int(args["size"]), service),
+                )
+            elif tool_name == "rollback_deployment":
+                connection.execute(
+                    "UPDATE service_state SET version = %s, updated_at = now() WHERE service = %s",
+                    (str(args["to_version"]), service),
+                )
+            elif tool_name == "restart_service":
+                connection.execute(
+                    "UPDATE service_state SET restart_count = restart_count + 1, "
+                    "updated_at = now() WHERE service = %s",
+                    (service,),
+                )
+            else:
+                raise ValueError(f"Unsupported mutation: {tool_name}")
+        return {"status": "executed", "backend": "modeled-service-state", "tool": tool_name}

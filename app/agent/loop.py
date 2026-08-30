@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import hashlib
 import re
 from dataclasses import dataclass
 from typing import Any
 
+import app.tools.mutating  # noqa: F401  # Register the gated mutation surface.
 from app.models import ActionProposal, Claim, EvidenceRef, InvestigationResult
 from app.tools import ToolContext
 from app.tools.diagnostic import registry
@@ -80,8 +80,10 @@ KNOWN_SERVICES = (
 class IncidentAgent:
     """A bounded plan→call→observe→correlate loop with structural citations."""
 
-    def __init__(self, datastore: Any, *, prompt_variant: str = "guarded") -> None:
-        self.context = ToolContext(datastore=datastore)
+    def __init__(
+        self, datastore: Any, *, prompt_variant: str = "guarded", audit: Any | None = None
+    ) -> None:
+        self.context = ToolContext(datastore=datastore, audit=audit)
         self.prompt_variant = prompt_variant
 
     @staticmethod
@@ -202,17 +204,11 @@ class IncidentAgent:
         proposal = None
         if action:
             args = self._action_args(action, service)
-            args_hash = hashlib.sha256(repr(sorted(args.items())).encode()).hexdigest()
-            proposal_id = hashlib.sha256((action + repr(args)).encode()).hexdigest()[:12]
-            proposal = ActionProposal(
-                tool_call_id=f"proposal_{proposal_id}",
-                tool=action,
-                args=args,
-                args_hash=args_hash,
+            proposal = registry.propose(
+                action,
                 rationale=f"Mitigate {rule.root_cause} after human review",
-                risk=rule.risk,  # type: ignore[arg-type]
-                reversible=True,
                 evidence=self._refs(all_evidence),
+                **args,
             )
         summary = f"Evidence is consistent with {rule.root_cause.replace('_', ' ')}."
         return self._result(
@@ -265,7 +261,7 @@ class IncidentAgent:
         claim = Claim(
             text=summary, confidence=confidence, evidence=refs, confirmed=confidence >= 0.7
         )
-        return InvestigationResult(
+        result = InvestigationResult(
             description=description,
             root_cause=root_cause,
             summary=summary,
@@ -280,3 +276,13 @@ class IncidentAgent:
             attempted_actions=attempted_actions or [],
             prompt_variant=self.prompt_variant,
         )
+        if self.context.audit and (refused or escalated or proposal):
+            decision = "refused" if refused else "escalated" if escalated else "proposed"
+            self.context.audit.append(
+                decision=decision,
+                tool=proposal.tool if proposal else None,
+                tool_call_id=proposal.tool_call_id if proposal else None,
+                args=proposal.args if proposal else {},
+                outcome=refusal_reason or root_cause,
+            )
+        return result

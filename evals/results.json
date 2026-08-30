@@ -1,10 +1,10 @@
 {
-  "generated_at": "2026-08-30T23:08:03.546750+00:00",
+  "generated_at": "2026-08-30T23:13:26.510267+00:00",
   "scenario_count": 16,
   "backend": "fixture",
   "deterministic": true,
   "judge": null,
-  "git_revision": "5508ef5",
+  "git_revision": "c9cfa56",
   "variants": {
     "baseline": {
       "model": "deterministic-rules-v1",

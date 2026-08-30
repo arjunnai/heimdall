@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -7,7 +9,7 @@ from inspect import signature
 from typing import Any, Literal, Protocol, TypeVar
 from uuid import uuid4
 
-from app.models import ToolCall
+from app.models import ActionProposal, EvidenceRef, ToolCall
 
 Risk = Literal["low", "medium", "high"]
 F = TypeVar("F", bound=Callable[..., dict[str, Any]])
@@ -39,6 +41,8 @@ class ToolSpec:
 class ToolContext:
     datastore: DataStore
     trace: list[ToolCall] = field(default_factory=list)
+    audit: Any | None = None
+    approval_tokens: Any | None = None
 
 
 def tool(*, mutating: bool, risk: Risk) -> Callable[[F], F]:
@@ -109,7 +113,53 @@ class ToolRegistry:
                 ts=datetime.now(UTC),
             )
         )
+        if context.audit:
+            context.audit.append(
+                decision="auto",
+                tool=name,
+                tool_call_id=tool_call_id,
+                args=args,
+                outcome="diagnostic_executed",
+            )
         return result
+
+    def propose(
+        self,
+        name: str,
+        *,
+        rationale: str,
+        evidence: list[EvidenceRef],
+        **args: Any,
+    ) -> ActionProposal:
+        spec = self.spec(name)
+        if not spec.mutating:
+            raise TypeError(f"Diagnostic tool {name} does not require a proposal")
+        return ActionProposal(
+            tool_call_id=f"call_{uuid4().hex[:12]}",
+            tool=name,
+            args=args,
+            args_hash=canonical_args_hash(args),
+            rationale=rationale,
+            risk=spec.risk,
+            reversible=True,
+            evidence=evidence,
+        )
+
+    def execute_mutation(
+        self,
+        proposal: ActionProposal,
+        context: ToolContext,
+        approval_token: str | None,
+    ) -> dict[str, Any]:
+        function = self.get(proposal.tool)
+        if not self.spec(proposal.tool).mutating:
+            raise TypeError(f"{proposal.tool} is not a mutating tool")
+        return function(context=context, proposal=proposal, approval_token=approval_token)
+
+
+def canonical_args_hash(args: dict[str, Any]) -> str:
+    encoded = json.dumps(args, sort_keys=True, separators=(",", ":"), default=str).encode()
+    return hashlib.sha256(encoded).hexdigest()
 
 
 registry = ToolRegistry()
