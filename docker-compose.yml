@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: opspilot
+      POSTGRES_USER: opspilot
+      POSTGRES_PASSWORD: opspilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opspilot -d opspilot"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    environment:
+      DATABASE_URL: postgresql://opspilot:opspilot@postgres:5432/opspilot
+      APPROVAL_SECRET: ${APPROVAL_SECRET:-development-only-secret-change-me-now}
+      AUDIT_LOG_PATH: /workspace/audit/events.jsonl
+    command: >-
+      sh -c "python db/seed.py checkout_v42_pool &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./audit:/workspace/audit
+
+  ui:
+    build: .
+    environment:
+      OPSPILOT_API_URL: http://app:8000
+    command: streamlit run ui/streamlit_app.py --server.address=0.0.0.0
+    ports:
+      - "8501:8501"
+    depends_on:
+      - app
+
+volumes:
+  postgres_data:
+

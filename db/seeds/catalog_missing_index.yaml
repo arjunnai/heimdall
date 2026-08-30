@@ -1,0 +1,33 @@
+service_state:
+  service: catalog
+  version: v17
+metrics:
+  - {evidence_id: "metric:catalog:p95:10:20", service: catalog, metric: latency_p95_ms, value: 2240, unit: ms}
+  - {evidence_id: "metric:catalog:db_cpu:10:20", service: catalog, metric: db_cpu_pct, value: 91, unit: percent}
+deployments:
+  - {evidence_id: "deploy:catalog:v17", service: catalog, version: v17, commit_sha: b17c2de, status: succeeded}
+logs:
+  - evidence_id: "log:catalog:slow_orders_query"
+    service: catalog
+    severity: WARN
+    message: "slow query 2214ms: SELECT * FROM orders WHERE customer_id = 4242"
+    attributes: {table: orders, duration_ms: 2214}
+query_plan:
+  Node Type: Seq Scan
+  Relation Name: orders
+  Plan Rows: 100000
+  Total Cost: 1889.0
+query_plan_evidence: ["explain:orders:customer_id:seq_scan"]
+table_stats:
+  orders: {n_live_tup: 100000, n_dead_tup: 120, last_analyze: "2026-08-30T10:00:00Z"}
+index_stats:
+  orders:
+    - {evidence_id: "index_stats:orders:orders_pkey", index_name: orders_pkey, idx_scan: 120, definition: "CREATE UNIQUE INDEX orders_pkey ON public.orders USING btree (id)"}
+orders:
+  - {customer_id: 4242, status: paid, notes: "seeded row"}
+runbooks:
+  - evidence_id: "runbook:missing-index:1"
+    source: missing-index.md
+    heading: Missing index
+    content: "A sequential scan with high plan rows on a selective predicate indicates a missing index. Verify existing index definitions before proposing CREATE INDEX CONCURRENTLY."
+

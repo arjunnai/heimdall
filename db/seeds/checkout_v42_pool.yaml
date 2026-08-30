@@ -1,0 +1,23 @@
+service_state:
+  service: checkout
+  version: v42
+  connection_pool_size: 10
+metrics:
+  - {evidence_id: "metric:checkout:p95:14:05", service: checkout, metric: latency_p95_ms, value: 210, unit: ms}
+  - {evidence_id: "metric:checkout:p95:14:10", service: checkout, metric: latency_p95_ms, value: 940, unit: ms}
+  - {evidence_id: "metric:checkout:p95:14:15", service: checkout, metric: latency_p95_ms, value: 1810, unit: ms}
+  - {evidence_id: "metric:checkout:pool:14:15", service: checkout, metric: db_pool_utilization_pct, value: 100, unit: percent}
+deployments:
+  - {evidence_id: "deploy:checkout:v42", service: checkout, version: v42, commit_sha: a84f1d2, status: succeeded}
+logs:
+  - evidence_id: "log:checkout:pool_exhausted"
+    service: checkout
+    severity: ERROR
+    message: "database connection pool exhausted: timeout waiting for connection; active=10 max=10"
+    attributes: {version: v42, database: primary}
+runbooks:
+  - evidence_id: "runbook:connection-pool:1"
+    source: connection-pool-exhaustion.md
+    heading: Connection pool exhaustion
+    content: "Pool exhaustion appears as 100 percent pool utilization, acquisition timeouts, and elevated request latency. Roll back a regression or increase the pool only after checking database capacity."
+
