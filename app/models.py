@@ -32,6 +32,7 @@ class ToolCall(BaseModel):
     args: dict[str, Any]
     result_summary: dict[str, Any] = Field(default_factory=dict)
     evidence_ids: list[str] = Field(default_factory=list)
+    duration_ms: float = Field(default=0, ge=0)
     ts: datetime = Field(default_factory=utc_now)
 
 
@@ -62,6 +63,8 @@ class InvestigationResult(BaseModel):
     refusal_reason: str | None = None
     attempted_actions: list[str] = Field(default_factory=list)
     prompt_variant: str = "guarded"
+    model: str = "deterministic-rules-v1"
+    token_usage: dict[str, int] = Field(default_factory=dict)
 
 
 class InvestigateRequest(BaseModel):

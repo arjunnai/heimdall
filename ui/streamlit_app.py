@@ -42,6 +42,7 @@ st.markdown(
 .stApp { background: var(--surface); color: var(--ink); font-family: 'Public Sans', sans-serif; }
 header[data-testid="stHeader"] { background: color-mix(in oklch, var(--surface) 92%, transparent); }
 [data-testid="stSidebar"] { background: oklch(0.145 0.011 155); border-right: 1px solid var(--line); }
+[data-testid="stSidebar"] h1 { color: var(--ink); }
 h1, h2, h3 { font-family: 'Chivo', sans-serif; letter-spacing: -0.025em; color: var(--ink); }
 h1 { font-size: 2.1rem; font-weight: 600; }
 h2 { font-size: 1.35rem; font-weight: 600; }
@@ -62,6 +63,9 @@ p, label, [data-testid="stCaptionContainer"] { color: var(--ink-muted); }
 
 .stButton > button { border-radius: 2px; border: 1px solid var(--line); font-family: 'Chivo', sans-serif; min-height: 42px; }
 .stButton > button[kind="primary"] { background: var(--signal); color: oklch(0.18 0.025 82); border-color: var(--signal); }
+[data-testid="stBaseButton-primary"] p { color: oklch(0.18 0.025 82); }
+[data-testid="stBaseButton-secondary"] { background: transparent; border-color: var(--line); }
+[data-testid="stBaseButton-secondary"] p { color: var(--ink); }
 .stTextArea textarea, .stSelectbox div[data-baseweb="select"] { border-radius: 2px; background: var(--surface-raised); }
 [data-testid="stDataFrame"] { border: 1px solid var(--line); }
 [data-testid="stMetricValue"] { font-family: 'Chivo', sans-serif; }
@@ -139,7 +143,7 @@ description = st.text_area(
     help="Paste an alert, operator observation, or incident summary.",
 )
 
-if st.button("Begin investigation", type="primary", use_container_width=True):
+if st.button("Begin investigation", type="primary", width="stretch"):
     if not description.strip():
         st.warning("Add an incident signal before investigating.")
     else:
@@ -180,17 +184,17 @@ if result:
         ["Investigation timeline", "Evidence ledger", "Audit"]
     )
     with timeline_tab:
-        st.dataframe(timeline_rows(result), use_container_width=True, hide_index=True)
+        st.dataframe(timeline_rows(result), width="stretch", hide_index=True)
     with evidence_tab:
         rows = evidence_rows(result)
         if rows:
-            st.dataframe(rows, use_container_width=True, hide_index=True)
+            st.dataframe(rows, width="stretch", hide_index=True)
         else:
             st.info("No confirmed evidence is available. Escalate rather than infer.")
     with audit_tab:
         try:
             events = api_get("/audit")["events"]
-            st.dataframe(events, use_container_width=True, hide_index=True)
+            st.dataframe(events, width="stretch", hide_index=True)
         except requests.RequestException as exc:
             st.warning(f"Audit unavailable: {exc}")
 
@@ -209,7 +213,7 @@ if result:
         )
         st.json(proposal["args"], expanded=False)
         approve_col, reject_col = st.columns([1, 1])
-        if approve_col.button("Approve signed action", type="primary", use_container_width=True):
+        if approve_col.button("Approve signed action", type="primary", width="stretch"):
             try:
                 decision = api_post(
                     "/approve",
@@ -223,7 +227,7 @@ if result:
                 st.rerun()
             except requests.RequestException as exc:
                 st.error(f"Approval failed: {exc}")
-        if reject_col.button("Reject and halt", use_container_width=True):
+        if reject_col.button("Reject and halt", width="stretch"):
             try:
                 decision = api_post(
                     "/approve",

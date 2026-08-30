@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from typing import Any
 
 import app.tools.mutating  # noqa: F401  # Register the gated mutation surface.
+from app.agent.provider import LLMProvider
 from app.models import ActionProposal, Claim, EvidenceRef, InvestigationResult
 from app.tools import ToolContext
 from app.tools.diagnostic import registry
@@ -81,10 +83,18 @@ class IncidentAgent:
     """A bounded plan→call→observe→correlate loop with structural citations."""
 
     def __init__(
-        self, datastore: Any, *, prompt_variant: str = "guarded", audit: Any | None = None
+        self,
+        datastore: Any,
+        *,
+        prompt_variant: str = "guarded",
+        audit: Any | None = None,
+        provider: LLMProvider | None = None,
     ) -> None:
         self.context = ToolContext(datastore=datastore, audit=audit)
         self.prompt_variant = prompt_variant
+        self.provider = provider
+        self.provider_model = "deterministic-rules-v1"
+        self.token_usage: dict[str, int] = {}
 
     @staticmethod
     def _service(description: str, datastore: Any) -> str:
@@ -201,13 +211,42 @@ class IncidentAgent:
 
         rule = matches[0]
         action = rule.action
+        confidence = 0.93
+        selected_evidence = all_evidence
+        if self.provider:
+            try:
+                candidate = self._provider_candidate(
+                    description=description,
+                    service=service,
+                    allowed_root_cause=rule.root_cause,
+                    allowed_action=rule.action,
+                    evidence_ids=all_evidence,
+                    observations={
+                        "metrics": metrics.get("rows", []),
+                        "deployments": deployments.get("rows", []),
+                        "logs": logs.get("rows", []),
+                        "runbooks": runbooks.get("rows", []),
+                    },
+                )
+                action = candidate.get("action")
+                confidence = float(candidate["confidence"])
+                selected_evidence = candidate["evidence_ids"]
+            except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+                return self._result(
+                    description,
+                    "provider_output_unverified",
+                    "The model output failed structural validation; human escalation is required.",
+                    0.2,
+                    all_evidence,
+                    escalated=True,
+                )
         proposal = None
         if action:
             args = self._action_args(action, service)
             proposal = registry.propose(
                 action,
                 rationale=f"Mitigate {rule.root_cause} after human review",
-                evidence=self._refs(all_evidence),
+                evidence=self._refs(selected_evidence),
                 **args,
             )
         summary = f"Evidence is consistent with {rule.root_cause.replace('_', ' ')}."
@@ -215,11 +254,67 @@ class IncidentAgent:
             description,
             rule.root_cause,
             summary,
-            0.93,
-            all_evidence,
+            confidence,
+            selected_evidence,
             proposal=proposal,
             escalated=rule.risk == "high" and proposal is None,
         )
+
+    def _provider_candidate(
+        self,
+        *,
+        description: str,
+        service: str,
+        allowed_root_cause: str,
+        allowed_action: str | None,
+        evidence_ids: list[str],
+        observations: dict[str, Any],
+    ) -> dict[str, Any]:
+        assert self.provider is not None
+        response = self.provider.complete(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "Correlate incident evidence. Return JSON only with root_cause, "
+                        "confidence (0..1), action (string or null), and evidence_ids. "
+                        "Use only the supplied evidence IDs; never invent schema or evidence."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps(
+                        {
+                            "incident": description,
+                            "service": service,
+                            "allowed_root_cause": allowed_root_cause,
+                            "allowed_action": allowed_action,
+                            "available_evidence_ids": evidence_ids,
+                            "observations": observations,
+                        },
+                        default=str,
+                    ),
+                },
+            ],
+            temperature=0,
+        )
+        candidate = json.loads(response.content)
+        self.provider_model = response.model
+        self.token_usage = {
+            "input_tokens": response.input_tokens,
+            "output_tokens": response.output_tokens,
+        }
+        if candidate.get("root_cause") != allowed_root_cause:
+            raise ValueError("Provider root cause is not supported by deterministic evidence")
+        if candidate.get("action") not in {None, allowed_action}:
+            raise ValueError("Provider action is outside the bounded action set")
+        confidence = float(candidate["confidence"])
+        if not 0 <= confidence <= 1:
+            raise ValueError("Provider confidence is outside 0..1")
+        cited = candidate.get("evidence_ids")
+        if not isinstance(cited, list) or not cited or not set(cited) <= set(evidence_ids):
+            raise ValueError("Provider cited unavailable evidence")
+        return candidate
 
     @staticmethod
     def _action_args(action: str, service: str) -> dict[str, Any]:
@@ -275,6 +370,8 @@ class IncidentAgent:
             refusal_reason=refusal_reason,
             attempted_actions=attempted_actions or [],
             prompt_variant=self.prompt_variant,
+            model=self.provider_model,
+            token_usage=self.token_usage,
         )
         if self.context.audit and (refused or escalated or proposal):
             decision = "refused" if refused else "escalated" if escalated else "proposed"

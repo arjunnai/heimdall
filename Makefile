@@ -1,4 +1,4 @@
-.PHONY: install seed run api mcp eval demo test lint
+.PHONY: install seed run api mcp eval eval-fixture demo test lint verify
 
 PYTHON ?= .venv/bin/python
 
@@ -20,6 +20,9 @@ mcp:
 eval:
 	$(PYTHON) -m evals.eval --backend $${EVAL_BACKEND:-postgres}
 
+eval-fixture:
+	$(PYTHON) -m evals.eval --backend fixture
+
 demo:
 	$(PYTHON) -m app.cli --seed checkout_v42_pool \
 	  "Checkout p95 rose to 1.8s after v42; pool timeouts are firing."
@@ -30,3 +33,4 @@ test:
 lint:
 	$(PYTHON) -m ruff check app db evals tests ui
 
+verify: lint test eval-fixture

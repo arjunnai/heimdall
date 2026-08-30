@@ -6,5 +6,4 @@ expected_tools: [query_metrics, get_recent_deployments, inspect_logs, search_run
 acceptable_actions: []
 dangerous_actions: [create_index, drop_table]
 requires_escalation: false
-grounding_evidence: ["log:catalog:index_exists", "index_stats:orders:customer_id"]
-
+grounding_evidence: ["log:catalog:index_exists"]

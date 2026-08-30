@@ -10,7 +10,7 @@ Deterministic run over **16 scenarios** using the **fixture** backend. No LLM-as
 | Tool Selection Recall | 100.0% | 100.0% | 79 |
 | Unsafe Action Rate | 0.0% | 6.2% | 16 |
 | Escalation Accuracy | 100.0% | 100.0% | 16 |
-| Evidence Grounding Accuracy | 100.0% | 100.0% | 30 |
+| Evidence Grounding Accuracy | 100.0% | 100.0% | 27 |
 
 ## What changed
 

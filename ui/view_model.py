@@ -28,6 +28,7 @@ def timeline_rows(result: dict[str, Any]) -> list[dict[str, str | int]]:
                 "tool": call["tool"],
                 "tool_call_id": call["tool_call_id"],
                 "evidence": len(call.get("evidence_ids", [])),
+                "latency_ms": round(float(call.get("duration_ms", 0)), 1),
                 "outcome": call.get("result_summary", {}).get("status", "ok"),
             }
         )

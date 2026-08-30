@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     database_url: str = "postgresql://opspilot:opspilot@localhost:5432/opspilot"
-    llm_provider: str = "anthropic"
+    llm_provider: str = "deterministic"
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     anthropic_model: str = "claude-sonnet-4-20250514"

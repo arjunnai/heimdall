@@ -6,6 +6,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from inspect import signature
+from time import perf_counter
 from typing import Any, Literal, Protocol, TypeVar
 from uuid import uuid4
 
@@ -97,7 +98,9 @@ class ToolRegistry:
                 f"Mutating tool {name} cannot execute through the diagnostic invocation path"
             )
         tool_call_id = f"call_{uuid4().hex[:12]}"
+        started = perf_counter()
         result = function(context=context, **args)
+        duration_ms = (perf_counter() - started) * 1000
         evidence_ids = list(result.get("evidence_ids", []))
         result["tool_call_id"] = tool_call_id
         context.trace.append(
@@ -110,6 +113,7 @@ class ToolRegistry:
                     "status": result.get("status", "ok"),
                 },
                 evidence_ids=evidence_ids,
+                duration_ms=duration_ms,
                 ts=datetime.now(UTC),
             )
         )

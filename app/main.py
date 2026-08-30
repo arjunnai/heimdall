@@ -6,6 +6,7 @@ from fastapi import FastAPI, HTTPException, Query
 
 import app.tools.mutating  # noqa: F401
 from app.agent import IncidentAgent
+from app.agent.provider import make_provider
 from app.config import get_settings
 from app.data import FixtureDataStore, PostgresDataStore
 from app.models import ApprovalRequest, InvestigateRequest, InvestigationResult
@@ -42,7 +43,13 @@ def investigate(request: InvestigateRequest) -> InvestigationResult:
             if request.seed
             else PostgresDataStore(get_settings().database_url)
         )
-        agent = IncidentAgent(datastore, prompt_variant=request.prompt_variant, audit=audit_log)
+        provider = None if settings.llm_provider == "deterministic" else make_provider(settings)
+        agent = IncidentAgent(
+            datastore,
+            prompt_variant=request.prompt_variant,
+            audit=audit_log,
+            provider=provider,
+        )
         result = agent.investigate(request.description)
         if result.proposed_action:
             pending_proposals[result.proposed_action.tool_call_id] = (

@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from app.agent import IncidentAgent
+from app.agent.provider import LLMProvider, ProviderResponse
 from app.data import FixtureDataStore
 from app.main import app
 from app.tools.diagnostic import diagnostic_tool_names, registry
@@ -51,3 +52,23 @@ def test_fastapi_investigates_fixture() -> None:
     )
     assert response.status_code == 200
     assert response.json()["root_cause"] == "database_connection_pool_exhaustion"
+
+
+class GroundedFakeProvider(LLMProvider):
+    def complete(self, messages, *, temperature=0):
+        return ProviderResponse(
+            content=(
+                '{"root_cause":"database_connection_pool_exhaustion",'
+                '"confidence":0.91,"action":"increase_connection_pool",'
+                '"evidence_ids":["log:checkout:pool_exhausted"]}'
+            ),
+            model="grounded-fake",
+        )
+
+
+def test_provider_output_is_constrained_to_structural_evidence() -> None:
+    result = IncidentAgent(
+        FixtureDataStore("checkout_v42_pool"), provider=GroundedFakeProvider()
+    ).investigate("Checkout connection pool exhausted after v42")
+    assert result.root_cause == "database_connection_pool_exhaustion"
+    assert result.cited_evidence_ids == ["log:checkout:pool_exhausted"]
