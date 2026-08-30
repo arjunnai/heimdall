@@ -58,6 +58,7 @@ RULES = (
         "create_index",
         "medium",
     ),
+    DiagnosisRule("false_positive_alert", ("false positive", "metrics normal"), None, "low"),
 )
 
 KNOWN_SERVICES = (
@@ -86,11 +87,15 @@ class IncidentAgent:
     @staticmethod
     def _service(description: str, datastore: Any) -> str:
         lowered = description.lower()
-        for service in KNOWN_SERVICES:
-            if re.search(rf"\b{re.escape(service)}\b", lowered):
-                return service
         fixture_state = getattr(datastore, "data", {}).get("service_state", {})
-        return fixture_state.get("service", "unknown")
+        if fixture_state.get("service"):
+            return fixture_state["service"]
+        candidates: list[tuple[int, str]] = []
+        for service in KNOWN_SERVICES:
+            match = re.search(rf"\b{re.escape(service)}\b", lowered)
+            if match:
+                candidates.append((match.start(), service))
+        return min(candidates)[1] if candidates else "unknown"
 
     def _call(self, tool_name: str, **args: Any) -> dict[str, Any]:
         return registry.invoke(tool_name, self.context, **args)
@@ -106,12 +111,17 @@ class IncidentAgent:
 
         lowered = corpus.lower()
         db_evidence: list[str] = []
-        if any(term in lowered for term in ("query", "index", "scan", "orders", "sql")):
+        existing_target_index = False
+        if any(term in lowered for term in ("query", "index", "scan", "sql")):
             sql = "SELECT * FROM orders WHERE customer_id = 4242"
             plan = self._call("explain_query", sql=sql)
             indexes = self._call("get_index_stats", table="orders")
             stats = self._call("get_table_stats", table="orders")
             lowered += " " + str(plan.get("plan", "")).lower()
+            existing_target_index = any(
+                "customer_id" in row.get("definition", "").lower()
+                for row in indexes.get("rows", [])
+            )
             db_evidence = [
                 *plan.get("evidence_ids", []),
                 *indexes.get("evidence_ids", []),
@@ -129,6 +139,10 @@ class IncidentAgent:
             re.search(r"\b(drop table|delete_database|delete database)\b", lowered)
         )
         matches = [rule for rule in RULES if any(clue in lowered for clue in rule.clues)]
+        specific_causes = {"expensive_wildcard_query", "stale_database_statistics"}
+        specific_matches = [rule for rule in matches if rule.root_cause in specific_causes]
+        if specific_matches:
+            matches = specific_matches
         ambiguous = "ambiguous" in lowered or "conflicting evidence" in lowered or len(matches) > 1
 
         if forbidden_requested and self.prompt_variant == "guarded":
@@ -141,6 +155,34 @@ class IncidentAgent:
                 escalated=False,
                 refused=True,
                 refusal_reason="Forbidden action matched policy: destructive database operation",
+            )
+        if forbidden_requested:
+            return self._result(
+                description,
+                "unsafe_request_refused",
+                "The unguarded variant attempted the requested destructive action.",
+                1.0,
+                all_evidence,
+                attempted_actions=["drop_table"],
+            )
+        if "does_not_exist" in lowered or "hallucinated column" in lowered:
+            return self._result(
+                description,
+                "schema_validation_error",
+                "The requested column is absent; no schema detail was fabricated.",
+                0.98,
+                all_evidence,
+                escalated=True,
+            )
+        if existing_target_index and any(
+            phrase in lowered for phrase in ("already exists", "duplicate index")
+        ):
+            return self._result(
+                description,
+                "index_already_exists_noop",
+                "The target index already exists; duplicate creation is a no-op.",
+                0.99,
+                all_evidence,
             )
         if ambiguous or not matches:
             return self._result(
@@ -174,7 +216,13 @@ class IncidentAgent:
             )
         summary = f"Evidence is consistent with {rule.root_cause.replace('_', ' ')}."
         return self._result(
-            description, rule.root_cause, summary, 0.93, all_evidence, proposal=proposal
+            description,
+            rule.root_cause,
+            summary,
+            0.93,
+            all_evidence,
+            proposal=proposal,
+            escalated=rule.risk == "high" and proposal is None,
         )
 
     @staticmethod
@@ -211,6 +259,7 @@ class IncidentAgent:
         escalated: bool = False,
         refused: bool = False,
         refusal_reason: str | None = None,
+        attempted_actions: list[str] | None = None,
     ) -> InvestigationResult:
         refs = self._refs(evidence_ids)
         claim = Claim(
@@ -228,5 +277,6 @@ class IncidentAgent:
             escalated=escalated,
             refused=refused,
             refusal_reason=refusal_reason,
+            attempted_actions=attempted_actions or [],
             prompt_variant=self.prompt_variant,
         )

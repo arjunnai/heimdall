@@ -1,0 +1,17 @@
+service_state: {service: search, version: v26}
+metrics:
+  - {evidence_id: "metric:search:query_latency:13:40", service: search, metric: query_latency_ms, value: 3160, unit: ms}
+deployments: []
+logs:
+  - {evidence_id: "log:search:wildcard", service: search, severity: WARN, message: "expensive wildcard query: SELECT * FROM orders WHERE notes ILIKE '%refund%'", attributes: {table: orders}}
+query_plan: {Node Type: Seq Scan, Relation Name: orders, Plan Rows: 1000000, Total Cost: 28190}
+query_plan_evidence: ["explain:orders:notes:wildcard_seq_scan"]
+table_stats:
+  orders: {n_live_tup: 1000000, n_dead_tup: 1000, last_analyze: "2026-08-29T10:00:00Z"}
+index_stats:
+  orders:
+    - {evidence_id: "index_stats:orders:orders_pkey", index_name: orders_pkey, idx_scan: 90, definition: "CREATE UNIQUE INDEX orders_pkey ON orders (id)"}
+setup_sql:
+  - "INSERT INTO orders(customer_id, status, notes) SELECT n, 'paid', CASE WHEN n % 200 = 0 THEN 'refund requested' ELSE 'ordinary order' END FROM generate_series(1, 50000) AS n"
+runbooks:
+  - {evidence_id: "runbook:wildcard-query:1", source: wildcard-query.md, heading: Expensive wildcard query, content: "An expensive wildcard query with leading ILIKE '%term%' forces a sequential scan."}

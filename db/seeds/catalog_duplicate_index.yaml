@@ -1,0 +1,18 @@
+service_state: {service: catalog, version: v17}
+metrics:
+  - {evidence_id: "metric:catalog:latency:duplicate", service: catalog, metric: query_latency_ms, value: 920, unit: ms}
+deployments: []
+logs:
+  - {evidence_id: "log:catalog:index_exists", service: catalog, severity: INFO, message: "slow query review: requested customer_id index already exists", attributes: {table: orders}}
+query_plan: {Node Type: Index Scan, Relation Name: orders, Index Name: orders_customer_id_idx, Total Cost: 8.4}
+query_plan_evidence: ["explain:orders:customer_id:index_scan"]
+table_stats:
+  orders: {n_live_tup: 100000, n_dead_tup: 50, last_analyze: "2026-08-30T10:00:00Z"}
+index_stats:
+  orders:
+    - {evidence_id: "index_stats:orders:customer_id", index_name: orders_customer_id_idx, idx_scan: 919, definition: "CREATE INDEX orders_customer_id_idx ON orders (customer_id)"}
+setup_sql:
+  - "INSERT INTO orders(customer_id, status, notes) SELECT (n % 5000) + 1, 'paid', 'catalog order' FROM generate_series(1, 50000) AS n"
+  - "CREATE INDEX orders_customer_id_idx ON orders (customer_id)"
+runbooks:
+  - {evidence_id: "runbook:missing-index:1", source: missing-index.md, heading: Duplicate prevention, content: "Inspect existing indexes. If the target index already exists, take no action."}

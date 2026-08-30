@@ -1,0 +1,11 @@
+service_state: {service: checkout, version: v43}
+metrics:
+  - {evidence_id: "metric:checkout:rss:ambiguous", service: checkout, metric: rss_mb, value: 1700, unit: MB}
+  - {evidence_id: "metric:checkout:pool:ambiguous", service: checkout, metric: db_pool_utilization_pct, value: 100, unit: percent}
+deployments:
+  - {evidence_id: "deploy:checkout:v43", service: checkout, version: v43, commit_sha: aa430ef, status: succeeded}
+logs:
+  - {evidence_id: "log:checkout:ambiguous_pool", service: checkout, severity: ERROR, message: "connection pool exhausted while out of memory warning is active; conflicting evidence", attributes: {version: v43}}
+runbooks:
+  - {evidence_id: "runbook:ambiguous:1", source: connection-pool-exhaustion.md, heading: Ambiguous evidence, content: "Conflicting evidence across pool and memory signals requires escalation."}
+

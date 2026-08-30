@@ -1,0 +1,9 @@
+service_state: {service: shipping, version: v5}
+metrics:
+  - {evidence_id: "metric:shipping:p95:normal", service: shipping, metric: latency_p95_ms, value: 112, unit: ms}
+deployments: []
+logs:
+  - {evidence_id: "log:shipping:false_positive", service: shipping, severity: INFO, message: "false positive alert confirmed; metrics normal and health checks passing", attributes: {status: healthy}}
+runbooks:
+  - {evidence_id: "runbook:false-positive:1", source: traffic-spike.md, heading: False positives, content: "When metrics normal and checks pass, classify as false positive and take no action."}
+

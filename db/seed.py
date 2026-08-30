@@ -28,6 +28,8 @@ def seed_database(seed: str, database_url: str | None = None) -> None:
     data = yaml.safe_load(path.read_text())
     url = database_url or get_settings().database_url
     with psycopg.connect(url) as connection:
+        connection.execute("DROP INDEX IF EXISTS orders_customer_id_idx")
+        connection.execute("DROP INDEX IF EXISTS orders_notes_trgm_idx")
         connection.execute("TRUNCATE metrics, deployments, logs, service_state, orders")
         for table, columns in TABLE_COLUMNS.items():
             placeholders = ", ".join(["%s"] * len(columns))
@@ -47,6 +49,8 @@ def seed_database(seed: str, database_url: str | None = None) -> None:
                 "INSERT INTO orders(customer_id, status, notes) VALUES (%s, %s, %s)",
                 (row["customer_id"], row["status"], row.get("notes", "")),
             )
+        for statement in data.get("setup_sql", []):
+            connection.execute(statement)
         connection.execute("TRUNCATE runbook_chunks")
         for runbook in Path("runbooks").glob("*.md"):
             content = runbook.read_text()
@@ -62,7 +66,8 @@ def seed_database(seed: str, database_url: str | None = None) -> None:
                     deterministic_embedding(content),
                 ),
             )
-        connection.execute("ANALYZE")
+        if not data.get("skip_analyze", False):
+            connection.execute("ANALYZE")
 
 
 if __name__ == "__main__":

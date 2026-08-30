@@ -1,0 +1,10 @@
+service_state: {service: orders, version: v31}
+metrics:
+  - {evidence_id: "metric:orders:kafka_lag:09:30", service: orders, metric: kafka_consumer_lag, value: 18420, unit: messages}
+deployments:
+  - {evidence_id: "deploy:orders:v31", service: orders, version: v31, commit_sha: cc311aa, status: succeeded}
+logs:
+  - {evidence_id: "log:orders:rebalance_loop", service: orders, severity: ERROR, message: "consumer lag rising during rebalance loop", attributes: {group: order-writer}}
+runbooks:
+  - {evidence_id: "runbook:kafka-consumer-lag:1", source: kafka-consumer-lag.md, heading: Kafka consumer lag, content: "Consumer lag and repeated rebalance loops indicate an unhealthy consumer."}
+

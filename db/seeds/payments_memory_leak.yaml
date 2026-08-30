@@ -1,0 +1,11 @@
+service_state: {service: payments, version: v88}
+metrics:
+  - {evidence_id: "metric:payments:rss:11:00", service: payments, metric: rss_mb, value: 610, unit: MB}
+  - {evidence_id: "metric:payments:rss:12:00", service: payments, metric: rss_mb, value: 1810, unit: MB}
+deployments:
+  - {evidence_id: "deploy:payments:v88", service: payments, version: v88, commit_sha: ee8812a, status: succeeded}
+logs:
+  - {evidence_id: "log:payments:oom_warning", service: payments, severity: ERROR, message: "memory leak suspected: out of memory threshold approaching", attributes: {version: v88}}
+runbooks:
+  - {evidence_id: "runbook:memory-leak:1", source: memory-leak.md, heading: Service memory leak, content: "Memory leak shows monotonic RSS growth and out of memory warnings; roll back the suspect deployment."}
+

@@ -1,0 +1,9 @@
+service_state: {service: checkout, version: v42}
+metrics:
+  - {evidence_id: "metric:checkout:upstream_errors:16:00", service: checkout, metric: upstream_error_pct, value: 78, unit: percent}
+deployments: []
+logs:
+  - {evidence_id: "log:checkout:payments_timeout", service: checkout, severity: ERROR, message: "upstream timeout: payments dependency unavailable", attributes: {upstream: payments}}
+runbooks:
+  - {evidence_id: "runbook:dependency-outage:1", source: dependency-outage.md, heading: Dependency outage, content: "Upstream timeout across callers indicates a dependency outage and requires owner escalation."}
+

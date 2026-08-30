@@ -60,6 +60,7 @@ class InvestigationResult(BaseModel):
     escalated: bool = False
     refused: bool = False
     refusal_reason: str | None = None
+    attempted_actions: list[str] = Field(default_factory=list)
     prompt_variant: str = "guarded"
 
 

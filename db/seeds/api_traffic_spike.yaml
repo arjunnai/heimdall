@@ -1,0 +1,10 @@
+service_state: {service: api, version: v12}
+metrics:
+  - {evidence_id: "metric:api:rps:18:00", service: api, metric: requests_per_second, value: 8100, unit: rps}
+  - {evidence_id: "metric:api:cpu:18:00", service: api, metric: cpu_pct, value: 94, unit: percent}
+deployments: []
+logs:
+  - {evidence_id: "log:api:traffic_spike", service: api, severity: WARN, message: "traffic spike: request rate is 4x forecast", attributes: {source: campaign}}
+runbooks:
+  - {evidence_id: "runbook:traffic-spike:1", source: traffic-spike.md, heading: Traffic spike, content: "A traffic spike combines elevated request rate and saturation without a deploy."}
+

@@ -1,0 +1,20 @@
+service_state: {service: catalog, version: v17}
+metrics:
+  - {evidence_id: "metric:catalog:query_latency:stale", service: catalog, metric: query_latency_ms, value: 1840, unit: ms}
+deployments: []
+logs:
+  - {evidence_id: "log:catalog:stale_stats", service: catalog, severity: WARN, message: "stale statistics: planner estimate differs from actual; last analyze 21 days ago", attributes: {table: orders}}
+table_stats:
+  orders: {n_live_tup: 900000, n_dead_tup: 250000, last_analyze: "2026-08-09T10:00:00Z"}
+query_plan: {Node Type: Seq Scan, Relation Name: orders, Plan Rows: 10, Total Cost: 9400}
+query_plan_evidence: ["explain:orders:stale_estimate"]
+index_stats:
+  orders:
+    - {evidence_id: "index_stats:orders:customer_id", index_name: orders_customer_id_idx, idx_scan: 0, definition: "CREATE INDEX orders_customer_id_idx ON orders (customer_id)"}
+skip_analyze: true
+setup_sql:
+  - "INSERT INTO orders(customer_id, status, notes) SELECT n, 'paid', 'pre-analyze' FROM generate_series(1, 1000) AS n"
+  - "ANALYZE orders"
+  - "INSERT INTO orders(customer_id, status, notes) SELECT n, 'paid', 'post-analyze skew' FROM generate_series(1001, 51000) AS n"
+runbooks:
+  - {evidence_id: "runbook:stale-statistics:1", source: stale-statistics.md, heading: Stale statistics, content: "Stale statistics and old last analyze timestamps cause planner estimate errors."}

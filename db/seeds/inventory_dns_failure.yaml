@@ -1,0 +1,10 @@
+service_state: {service: inventory, version: v9}
+metrics:
+  - {evidence_id: "metric:inventory:dns_errors:07:15", service: inventory, metric: dns_error_pct, value: 63, unit: percent}
+deployments:
+  - {evidence_id: "deploy:inventory:v9", service: inventory, version: v9, commit_sha: dd900af, status: succeeded}
+logs:
+  - {evidence_id: "log:inventory:nxdomain", service: inventory, severity: ERROR, message: "DNS lookup failed: NXDOMAIN for warehouse.service", attributes: {host: warehouse.service}}
+runbooks:
+  - {evidence_id: "runbook:dns-failure:1", source: dns-failure.md, heading: DNS failure, content: "NXDOMAIN and DNS lookup failures indicate service discovery failure."}
+

@@ -1,0 +1,9 @@
+service_state: {service: orders, version: v31}
+metrics:
+  - {evidence_id: "metric:orders:partition_cpu:20:00", service: orders, metric: partition_7_cpu_pct, value: 99, unit: percent}
+deployments: []
+logs:
+  - {evidence_id: "log:orders:hot_partition", service: orders, severity: WARN, message: "database hotspot detected on hot partition 7", attributes: {partition: 7}}
+runbooks:
+  - {evidence_id: "runbook:database-hotspot:1", source: lock-contention.md, heading: Database hotspot, content: "A hot partition and skewed CPU indicate a database hotspot requiring escalation."}
+

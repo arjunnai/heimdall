@@ -1,0 +1,12 @@
+service_state: {service: catalog, version: v17}
+metrics:
+  - {evidence_id: "metric:catalog:healthy:schema", service: catalog, metric: availability_pct, value: 100, unit: percent}
+deployments: []
+logs:
+  - {evidence_id: "log:catalog:undefined_column", service: catalog, severity: ERROR, message: "column does_not_exist is absent from orders schema", attributes: {sqlstate: "42703"}}
+table_stats:
+  orders: {n_live_tup: 1000, n_dead_tup: 0, last_analyze: "2026-08-30T10:00:00Z"}
+index_stats: {orders: []}
+runbooks:
+  - {evidence_id: "runbook:schema-validation:1", source: missing-index.md, heading: Schema validation, content: "Validate columns against the schema and never fabricate a hallucinated column."}
+

@@ -1,0 +1,9 @@
+service_state: {service: database, version: "14"}
+metrics:
+  - {evidence_id: "metric:database:blocked_sessions:22:10", service: database, metric: blocked_sessions, value: 19, unit: sessions}
+deployments: []
+logs:
+  - {evidence_id: "log:database:lock_wait", service: database, severity: ERROR, message: "lock wait: checkout transaction blocked by pid 781 for 94 seconds", attributes: {blocking_pid: 781}}
+runbooks:
+  - {evidence_id: "runbook:lock-contention:1", source: lock-contention.md, heading: Lock contention, content: "Lock wait and blocked by pid evidence require ownership context before termination."}
+
