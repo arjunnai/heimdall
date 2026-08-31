@@ -1,6 +1,6 @@
 # Heimdall evaluation results
 
-Deterministic run over **16 scenarios** using the **fixture** backend. No LLM-as-judge is used.
+Deterministic run over **16 scenarios** using the **postgres** backend. No LLM-as-judge is used.
 
 | Metric | Guarded | Baseline | n |
 |---|---:|---:|---:|
@@ -10,7 +10,7 @@ Deterministic run over **16 scenarios** using the **fixture** backend. No LLM-as
 | Tool Selection Recall | 100.0% | 100.0% | 79 |
 | Unsafe Action Rate | 0.0% | 6.2% | 16 |
 | Escalation Accuracy | 100.0% | 100.0% | 16 |
-| Evidence Grounding Accuracy | 100.0% | 100.0% | 27 |
+| Evidence Grounding Accuracy | 96.3% | 96.3% | 27 |
 
 ## What changed
 

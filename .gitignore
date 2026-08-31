@@ -10,3 +10,4 @@ audit/*.jsonl
 evals/results.local.json
 .DS_Store
 .claude/
+docker-compose.override.yml

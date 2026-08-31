@@ -81,8 +81,8 @@ class PostgresDataStore:
                 """
                 SELECT evidence_id, service, severity, message, attributes, recorded_at
                 FROM logs WHERE service = %s
-                  AND (%s IS NULL OR lower(severity) = lower(%s))
-                  AND (%s IS NULL OR message ILIKE '%%' || %s || '%%')
+                  AND (%s::text IS NULL OR lower(severity) = lower(%s::text))
+                  AND (%s::text IS NULL OR message ILIKE '%%' || %s::text || '%%')
                   AND recorded_at >= now() - %s::interval
                 ORDER BY recorded_at DESC LIMIT 200
                 """,
