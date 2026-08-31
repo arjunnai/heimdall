@@ -1,6 +1,6 @@
 # Limitations and production path
 
-Heimdall v2 is a deliberately tight, reviewer-runnable teaching artifact. Its boundaries are part
+Heimdall v2.1 is a deliberately tight, reviewer-runnable teaching artifact. Its boundaries are part
 of the design, not hidden gaps.
 
 ## Real in v2
@@ -15,6 +15,7 @@ of the design, not hidden gaps.
 - deterministic scenario scoring with structural evidence verification
 - real one-shot HTTPS, DNS, and TLS snapshots for `arjunrnair.com` and `jobs.msemail.xyz`, behind
   exact-host and resolved-IP scope checks
+- real bounded discovery and crawling for `arjunrnair.com` and its label-boundary subdomains
 
 ## Live synthetics boundary
 
@@ -34,6 +35,30 @@ of the design, not hidden gaps.
   Database-only tools return `not_applicable`.
 - Live mode is diagnosis-only. A remediation can be proposed for human coordination, but the
   policy layer forbids execution of every mutating tool against the live datastore.
+
+## Property crawler boundary
+
+- `RESULTS_CRAWL.md` is a one-shot view from one runner, not an inventory guarantee, uptime
+  monitor, SLA, or scored benchmark. Hosts and routes can appear or disappear between runs.
+- Discovery does not use crt.sh, which was down for roughly two weeks with no ETA when CP8 was
+  built. TLS SAN is primary; CertSpotter, AlienVault OTX, and Wayback are independent best-effort
+  sources; a small DNS wordlist is the bounded fallback. Any source outage can reduce coverage.
+- A discovered name is reported only if it passes the `arjunrnair.com` label-boundary check and
+  resolves exclusively to permitted public addresses. Historical but currently unresolved names
+  are omitted rather than presented as live properties.
+- Crawling is sequential with at least 200 ms between same-host request starts, depth at most 2,
+  at most 25 attempted pages per host, and a global cap. This is polite but not a distributed or
+  geographically representative measurement.
+- `robots.txt` is fetched and `Disallow` rules are honored. Sitemap and HTML links remain
+  same-origin HTTPS and are scope-checked before fetch. Sites requiring JavaScript rendering,
+  authentication, or non-HTML navigation are not fully mapped.
+- Every route gets only a small number of sequential samples. p50/p95 therefore describe this
+  snapshot, not a statistically robust latency distribution.
+- Page bodies are parsed transiently for robots, sitemap locations, and links, then discarded;
+  only byte counts and SHA-256 hashes survive. Remote text is never supplied to the model.
+- The DNS-validation/client-connection rebinding caveat from the live probe also applies here.
+  Production should connect to the validated address while retaining hostname verification/SNI.
+- Property crawling remains diagnosis-only. No discovered host or route can receive a mutation.
 
 ## Intentionally modeled
 

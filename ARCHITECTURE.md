@@ -7,7 +7,7 @@ behind a human approval token. An eval harness scores the behavior — including
 grounding itself. See `PRD.md` for scope, `CLAUDE.md` for conventions, `PRIOR_ART.md`
 for the competitive landscape this design responds to.
 
-> Status: v2 implemented through CP7. The design below maps directly to the checked-in code,
+> Status: v2.1 implemented through CP8. The design below maps directly to the checked-in code,
 > deterministic scenario suite, signed approval policy, and Streamlit demo.
 > This revision folds in a deep-dive of HolmesGPT, k8sgpt, Aurora, OpenSRE, IncidentFox
 > (firecrawl, 2026-08). The differentiation below is what survives contact with those
@@ -52,6 +52,7 @@ them. It wins on the one gap all five share, plus legibility a portfolio needs:
                               Postgres  ── metrics / logs / deployments
                               pgvector  ── runbook embeddings (RAG)
                               WebProbe  ── guarded live HTTPS / DNS / TLS snapshots
+                              Crawler   ── resilient discovery / route health map
 ```
 
 ## Boundaries (the interview-defensible parts)
@@ -66,12 +67,15 @@ them. It wins on the one gap all five share, plus legibility a portfolio needs:
    (`deploy:checkout:v42`, `log:checkout:pool_exhausted`) bound to the `tool_call_id` that
    produced them, so the eval scorer verifies grounding — no prose hand-waving.
 4. **Escalation is a first-class outcome**, scored, not a failure path.
-5. **Live scope is code-level.** Only two exact HTTPS hosts are accepted, and every request and
-   redirect is refused when DNS returns a private, loopback, link-local, metadata, reserved, or
-   otherwise non-public address.
+5. **Live scope is code-level.** The direct CP7 probe accepts only two exact HTTPS hosts; the CP8
+   crawler uses its separate property boundary. Every request and redirect is refused when DNS
+   returns a private, loopback, link-local, metadata, reserved, or otherwise non-public address.
 6. **Remote content is untrusted data.** Body bytes terminate at the adapter boundary; only byte
    count and SHA-256 survive. Live datastores are diagnosis-only, so policy refuses mutations even
    after human approval.
+7. **Property scope is a label boundary.** The crawler accepts the apex or hosts ending in
+   `.arjunrnair.com`, never naive string suffixes. Discovery providers use a separate exact
+   allow-list and cannot become probe targets.
 
 ## Components
 
@@ -82,7 +86,7 @@ them. It wins on the one gap all five share, plus legibility a portfolio needs:
 | Tools | `app/tools/` | MCP tools, typed. `@tool(mutating=, risk=)`. Diagnostics use the selected Postgres, fixture, or guarded web adapter; mutating tools return proposals. |
 | RAG | `app/rag/` | chunk → embed → pgvector search; returns chunks with source ids |
 | Policy | `app/policy/` | risk policy (auto \| require-approval \| forbid), signed approval tokens, live-target scope/SSRF guard, diagnosis-only live mutation refusal, append-only audit log |
-| Data | `app/data/`, `db/schema.sql`, `db/seeds/` | Postgres and fixture telemetry plus the live `WebProbeDataStore`; per-scenario anomaly fixtures |
+| Data | `app/data/`, `db/schema.sql`, `db/seeds/` | Postgres/fixture telemetry, `WebProbeDataStore`, resilient discovery, and the bounded property crawler |
 | Runbooks | `runbooks/` | Markdown diagnostic guides used as the RAG corpus |
 | Evals | `evals/` | `eval.py`, `scorer.py` (deterministic — no LLM-judge), `results.json`, `RESULTS.md` |
 | UI | `ui/streamlit_app.py` | timeline + evidence + Approve/Reject |
@@ -149,6 +153,9 @@ root causes, chooses its own diagnostic calls, records actual model/token usage,
 CP7 adds `evals/live_probe.py`, a separate one-shot live investigation that writes only
 `RESULTS_LIVE.md`. It is explicitly non-deterministic and unscored; it never enters the 16-scenario
 benchmark.
+
+CP8 adds TLS-SAN/passive/active subdomain discovery and a robots-aware property crawler. Its
+one-shot `RESULTS_CRAWL.md` route map is unscored and separate from all prior result artifacts.
 
 ## Determinism
 

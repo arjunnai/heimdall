@@ -53,6 +53,15 @@ class ProbeTransport(Protocol):
 class RequestsProbeTransport:
     """HTTPS transport with guarded, manually followed redirects."""
 
+    def __init__(
+        self,
+        *,
+        user_agent: str = "Heimdall-Live-Probe/2.0",
+        same_origin_only: bool = False,
+    ) -> None:
+        self.user_agent = user_agent
+        self.same_origin_only = same_origin_only
+
     def fetch(
         self,
         target: ScopedTarget,
@@ -63,6 +72,7 @@ class RequestsProbeTransport:
     ) -> RawProbeResponse:
         started = perf_counter()
         current = target
+        original_origin = (target.host, target.port)
         redirect_count = 0
         while True:
             # Re-resolve immediately before every network request, including redirects.
@@ -70,7 +80,7 @@ class RequestsProbeTransport:
             response = requests.get(
                 current.url,
                 allow_redirects=False,
-                headers={"User-Agent": "Heimdall-Live-Probe/2.0"},
+                headers={"User-Agent": self.user_agent},
                 stream=True,
                 timeout=(timeout_seconds, timeout_seconds),
             )
@@ -79,8 +89,23 @@ class RequestsProbeTransport:
                     response.close()
                     raise ConnectionError("Live probe exceeded five guarded redirects")
                 next_url = urljoin(current.url, response.headers["location"])
+                next_target = scope_guard.validate(next_url)
+                if self.same_origin_only and (
+                    next_target.host,
+                    next_target.port,
+                ) != original_origin:
+                    total_ms = (perf_counter() - started) * 1000
+                    response.close()
+                    return RawProbeResponse(
+                        status_code=response.status_code,
+                        ttfb_ms=round(response.elapsed.total_seconds() * 1000, 3),
+                        total_ms=round(total_ms, 3),
+                        headers={},
+                        untrusted_body=b"",
+                        redirect_count=redirect_count + 1,
+                    )
                 response.close()
-                current = scope_guard.validate(next_url)
+                current = next_target
                 redirect_count += 1
                 continue
 

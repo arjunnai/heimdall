@@ -1,4 +1,4 @@
-.PHONY: install seed run api mcp eval eval-fixture eval-llm demo demo-live test lint verify
+.PHONY: install seed run api mcp eval eval-fixture eval-llm demo demo-live demo-crawl test lint verify
 
 PYTHON ?= .venv/bin/python
 
@@ -34,6 +34,10 @@ demo-live:
 	$(PYTHON) -m evals.live_probe \
 	  --target $${LIVE_TARGET:-https://arjunrnair.com} \
 	  --samples $${LIVE_PROBE_SAMPLES:-3}
+
+demo-crawl:
+	$(PYTHON) -m evals.crawl \
+	  --target $${CRAWL_TARGET:-arjunrnair.com}
 
 test:
 	$(PYTHON) -m pytest

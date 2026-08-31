@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-v2-2ea44f?style=flat" alt="Status">
+  <img src="https://img.shields.io/badge/status-v2.1-2ea44f?style=flat" alt="Status">
   <img src="https://img.shields.io/badge/python-3.11%2B-3776ab?style=flat" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/stack-FastAPI%20%7C%20MCP%20%7C%20pgvector-4b8bbe?style=flat" alt="Stack">
   <img src="https://img.shields.io/badge/unsafe--action-6.2%25%20%E2%86%92%200.0%25-2ea44f?style=flat" alt="Unsafe action rate">
-  <img src="https://img.shields.io/badge/tests-21%20passing-2ea44f?style=flat" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-27%20passing-2ea44f?style=flat" alt="Tests">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat" alt="License">
 </p>
 
@@ -23,6 +23,7 @@
   <a href="#quickstart">Quickstart</a> ·
   <a href="#tools">Tools</a> ·
   <a href="#live-sites">Live sites</a> ·
+  <a href="#crawler--property-map">Crawler</a> ·
   <a href="#evaluation">Evaluation</a> ·
   <a href="#safety">Safety</a> ·
   <a href="#how-its-different">How it's different</a> ·
@@ -166,6 +167,31 @@ Heimdall found a genuine ~2.2s p95 slowdown on a real production site and traced
 server/origin time — no mock, no fabrication. Reproduce with `make demo-live`; full report
 in [`evals/RESULTS_LIVE.md`](evals/RESULTS_LIVE.md).
 
+## Crawler / property map
+
+`make demo-crawl` performs a bounded, diagnosis-only crawl of `arjunrnair.com` and its
+real label-boundary subdomains. It discovers hosts from the apex certificate's TLS SANs,
+then independently tries CertSpotter, AlienVault OTX passive DNS, and Wayback CDX behind
+short timeouts. A bounded common-subdomain DNS wordlist always runs as the self-contained
+fallback. Results are deduplicated and retained only after public-DNS scope validation.
+
+```bash
+make demo-crawl
+CRAWL_TARGET=https://arjunrnair.com make demo-crawl
+```
+
+As of CP8, crt.sh has been unavailable for roughly two weeks with no published ETA.
+Heimdall does not query or depend on it; any passive source may fail without aborting the
+run. Discovery services use their own exact host allow-list and never broaden the property
+scope.
+
+The crawler honors `robots.txt` exclusions, checks `sitemap.xml`, follows same-origin HTTPS
+links only, re-validates every extracted link, caps depth at 2 and pages at 25 per host, applies
+a global cap, and spaces sequential requests by at least 200 ms. Page bytes remain quarantined:
+only counts and SHA-256 hashes survive into the health map, never page text. The resulting
+per-host/per-route map and worst-offender correlation are written to
+[`evals/RESULTS_CRAWL.md`](evals/RESULTS_CRAWL.md) as an unscored one-shot snapshot.
+
 ## Tools
 
 Diagnostic tools auto-execute. Mutating tools are approval-gated.
@@ -220,6 +246,8 @@ Full tables: [`evals/RESULTS_LLM.md`](evals/RESULTS_LLM.md) · [`evals/RESULTS.m
   escalated.
 - **Live-target guard** — exact allow-list and resolved-IP SSRF checks run before every live
   request and redirect; mutation execution fails closed for live datastores.
+- **Property boundary** — the crawler accepts only `arjunrnair.com` or a real
+  `*.arjunrnair.com` label suffix; look-alikes such as `arjunrnair.com.evil.com` fail closed.
 
 ## How it's different
 
@@ -239,7 +267,7 @@ The full competitive teardown (HolmesGPT · OpenSRE · k8sgpt · Aurora · Incid
 Honest by design (see [`LIMITATIONS.md`](LIMITATIONS.md)):
 
 - **Real:** Postgres queries, `EXPLAIN`, pg_stat_*, pgvector RAG, the policy/approval/audit
-  layer, the eval harness, and one-shot HTTPS/DNS/TLS synthetics for two allow-listed sites.
+  layer, the eval harness, one-shot HTTPS/DNS/TLS synthetics, and the bounded property crawler.
 - **Simulated:** cloud backends (K8s/Datadog/AWS) — seeded but genuinely queryable; mutating
   tools model the action rather than hitting a live cluster.
 - Live-model grounding drops on a few DB scenarios (see the per-scenario table) — a real,
@@ -249,6 +277,7 @@ Honest by design (see [`LIMITATIONS.md`](LIMITATIONS.md)):
 
 - [ ] Multi-tenant config (per-tenant policies + backend adapters)
 - [x] Add a real, diagnosis-only live synthetics adapter with SSRF and content boundaries
+- [x] Add resilient subdomain discovery and a bounded, robots-aware property health map
 - [ ] Add authenticated telemetry/deploy adapters (consume HolmesGPT / k8sgpt toolsets)
 - [ ] Production-miss → auto-generated regression scenario loop
 - [ ] Investigator / Remediator agent split

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import re
 import socket
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -8,6 +9,7 @@ from time import perf_counter
 from urllib.parse import urlsplit, urlunsplit
 
 ALLOWED_LIVE_HOSTS = frozenset({"arjunrnair.com", "jobs.msemail.xyz"})
+PROPERTY_ROOT_DOMAIN = "arjunrnair.com"
 _CLOUD_METADATA_ADDRESSES = frozenset(
     {
         ipaddress.ip_address("169.254.169.254"),
@@ -34,6 +36,7 @@ class ScopedTarget:
 
 
 Resolver = Callable[[str, int], Iterable[str]]
+_DNS_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 
 
 def _system_resolver(host: str, port: int) -> Iterable[str]:
@@ -50,9 +53,27 @@ class LiveScopeGuard:
         self,
         *,
         resolver: Resolver | None = None,
+        property_scope: bool = False,
     ) -> None:
         self.allowed_hosts = ALLOWED_LIVE_HOSTS
         self.resolver = resolver or _system_resolver
+        self.property_scope = property_scope
+
+    @classmethod
+    def for_arjunrnair_property(cls, *, resolver: Resolver | None = None) -> LiveScopeGuard:
+        return cls(resolver=resolver, property_scope=True)
+
+    def host_in_scope(self, host: str) -> bool:
+        normalized = host.lower().rstrip(".")
+        if len(normalized) > 253 or not all(
+            _DNS_LABEL.fullmatch(label) for label in normalized.split(".")
+        ):
+            return False
+        if self.property_scope:
+            return normalized == PROPERTY_ROOT_DOMAIN or normalized.endswith(
+                f".{PROPERTY_ROOT_DOMAIN}"
+            )
+        return normalized in self.allowed_hosts
 
     def normalize(self, target: str) -> tuple[str, str, int]:
         candidate = target.strip()
@@ -75,7 +96,7 @@ class LiveScopeGuard:
             host = parsed.hostname.encode("idna").decode("ascii").lower().rstrip(".")
         except UnicodeError as exc:
             raise ScopeRefusal("Live probe target hostname is invalid") from exc
-        if host not in self.allowed_hosts:
+        if not self.host_in_scope(host):
             raise ScopeRefusal(f"Host {host!r} is not in the live probe allow-list")
         netloc = host if port == 443 else f"{host}:{port}"
         url = urlunsplit(("https", netloc, parsed.path or "/", parsed.query, ""))
