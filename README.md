@@ -152,6 +152,20 @@ The boundary is code-enforced:
 Each run overwrites [`evals/RESULTS_LIVE.md`](evals/RESULTS_LIVE.md), clearly labeled as a
 non-deterministic snapshot rather than a benchmark. It does not modify either scored result file.
 
+### Live proof — `arjunrnair.com` (real, unedited snapshot)
+
+|  |  |
+|---|---|
+| Target | `https://arjunrnair.com` — 3/3 HTTP 200 |
+| Latency p95 | **2186 ms** (TTFB p95 2182 ms → origin/render time, not transfer) |
+| DNS / TLS | 2.1 ms · 51 days remaining |
+| Diagnosis | `web_latency_regression`, grounded in cited `metric:` + `log:` evidence ids |
+| Remediation | proposed, **not executed** — live-target policy forbids mutation |
+
+Heimdall found a genuine ~2.2s p95 slowdown on a real production site and traced it to
+server/origin time — no mock, no fabrication. Reproduce with `make demo-live`; full report
+in [`evals/RESULTS_LIVE.md`](evals/RESULTS_LIVE.md).
+
 ## Tools
 
 Diagnostic tools auto-execute. Mutating tools are approval-gated.
