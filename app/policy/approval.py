@@ -93,7 +93,12 @@ class ApprovalService:
         actor: str,
     ) -> dict[str, Any]:
         spec = self.registry.spec(proposal.tool)
-        decision = self.policy.decide(tool_name=proposal.tool, args=proposal.args, spec=spec)
+        decision = self.policy.decide(
+            tool_name=proposal.tool,
+            args=proposal.args,
+            spec=spec,
+            live_target=bool(getattr(context.datastore, "is_live_target", False)),
+        )
         if decision.decision != "require-approval":
             self.audit.append(
                 decision="refused",

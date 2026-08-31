@@ -7,7 +7,7 @@ behind a human approval token. An eval harness scores the behavior — including
 grounding itself. See `PRD.md` for scope, `CLAUDE.md` for conventions, `PRIOR_ART.md`
 for the competitive landscape this design responds to.
 
-> Status: v1 implemented through CP5. The design below maps directly to the checked-in code,
+> Status: v2 implemented through CP7. The design below maps directly to the checked-in code,
 > deterministic scenario suite, signed approval policy, and Streamlit demo.
 > This revision folds in a deep-dive of HolmesGPT, k8sgpt, Aurora, OpenSRE, IncidentFox
 > (firecrawl, 2026-08). The differentiation below is what survives contact with those
@@ -30,7 +30,7 @@ them. It wins on the one gap all five share, plus legibility a portfolio needs:
    generic approval config; OpenSRE: essentially the GitHub-issue path; Aurora: a post-hoc
    danger classifier that fails *open* to any write it doesn't flag; IncidentFox: approval
    is paywalled out of OSS).
-3. **Legible & reproducible.** A stranger runs `make eval` in 10 minutes and reads 15
+3. **Legible & reproducible.** A stranger runs `make eval` in 10 minutes and reads 16
    scenarios line-by-line. A 100-step loop over 40 toolsets is a product, not something
    defensible in a 45-minute interview. Scope is the feature.
 
@@ -51,6 +51,7 @@ them. It wins on the one gap all five share, plus legibility a portfolio needs:
                                             ▼
                               Postgres  ── metrics / logs / deployments
                               pgvector  ── runbook embeddings (RAG)
+                              WebProbe  ── guarded live HTTPS / DNS / TLS snapshots
 ```
 
 ## Boundaries (the interview-defensible parts)
@@ -65,6 +66,12 @@ them. It wins on the one gap all five share, plus legibility a portfolio needs:
    (`deploy:checkout:v42`, `log:checkout:pool_exhausted`) bound to the `tool_call_id` that
    produced them, so the eval scorer verifies grounding — no prose hand-waving.
 4. **Escalation is a first-class outcome**, scored, not a failure path.
+5. **Live scope is code-level.** Only two exact HTTPS hosts are accepted, and every request and
+   redirect is refused when DNS returns a private, loopback, link-local, metadata, reserved, or
+   otherwise non-public address.
+6. **Remote content is untrusted data.** Body bytes terminate at the adapter boundary; only byte
+   count and SHA-256 survive. Live datastores are diagnosis-only, so policy refuses mutations even
+   after human approval.
 
 ## Components
 
@@ -72,11 +79,11 @@ them. It wins on the one gap all five share, plus legibility a portfolio needs:
 |-----------|------|----------------|
 | API | `app/main.py` | FastAPI: `/investigate`, `/approve`, `/audit` |
 | Agent loop | `app/agent/` | Deterministic regression path plus a live provider path: model plans typed diagnostics → code validates/executes → model synthesizes only over returned evidence IDs → code validates citations/actions. `provider.py` switches Anthropic↔OpenAI and supports `ANTHROPIC_BASE_URL` |
-| Tools | `app/tools/` | MCP tools, typed. `@tool(mutating=, risk=)`. Diagnostic hit Postgres for real; mutating return proposals. YAML/decorator schema modeled on HolmesGPT's toolset shape (familiar to reviewers) + our `mutating`/`risk`/`evidence_ids` fields |
+| Tools | `app/tools/` | MCP tools, typed. `@tool(mutating=, risk=)`. Diagnostics use the selected Postgres, fixture, or guarded web adapter; mutating tools return proposals. |
 | RAG | `app/rag/` | chunk → embed → pgvector search; returns chunks with source ids |
-| Policy | `app/policy/` | risk policy (auto \| require-approval \| forbid), **signed approval tokens** (HMAC over tool_call_id + name + args_hash, short TTL), reversible execution, append-only audit log |
-| Data | `db/schema.sql`, `db/seeds/` | metrics/logs/deployments/DB-scenario tables; per-scenario anomaly fixtures |
-| Runbooks | `runbooks/` | 8–12 markdown docs, the RAG corpus |
+| Policy | `app/policy/` | risk policy (auto \| require-approval \| forbid), signed approval tokens, live-target scope/SSRF guard, diagnosis-only live mutation refusal, append-only audit log |
+| Data | `app/data/`, `db/schema.sql`, `db/seeds/` | Postgres and fixture telemetry plus the live `WebProbeDataStore`; per-scenario anomaly fixtures |
+| Runbooks | `runbooks/` | Markdown diagnostic guides used as the RAG corpus |
 | Evals | `evals/` | `eval.py`, `scorer.py` (deterministic — no LLM-judge), `results.json`, `RESULTS.md` |
 | UI | `ui/streamlit_app.py` | timeline + evidence + Approve/Reject |
 
@@ -139,6 +146,10 @@ CP6 adds a separate `llm` variant over the same scenarios and scorer. It does no
 root causes, chooses its own diagnostic calls, records actual model/token usage, and writes
 `results_llm.json` / `RESULTS_LLM.md` without overwriting the deterministic regression artifacts.
 
+CP7 adds `evals/live_probe.py`, a separate one-shot live investigation that writes only
+`RESULTS_LIVE.md`. It is explicitly non-deterministic and unscored; it never enters the 16-scenario
+benchmark.
+
 ## Determinism
 
 Temperature 0 for eval runs; fixed DB seed fixtures; pinned model ids; model id + prompt
@@ -156,11 +167,11 @@ hash recorded in `results.json` per run.
 
 ## What's real vs simulated
 
-- **Real:** Postgres queries, `EXPLAIN`, pg_stat_*, pgvector RAG, the policy/approval/audit
-  layer, the eval harness.
+- **Real:** Postgres queries, `EXPLAIN`, pg_stat_*, pgvector RAG, guarded one-shot live web
+  synthetics, the policy/approval/audit layer, and the eval harness.
 - **Simulated:** cloud backends (K8s/Datadog/AWS). Backends are seeded but genuinely
   queryable; mutating tools model the action, they don't hit a real cluster.
 
-Swapping simulated backends for real adapters — including consuming HolmesGPT toolsets or
+Adding authenticated production adapters — including consuming HolmesGPT toolsets or
 k8sgpt's MCP scan as diagnostic tools — is the forward-deployed integration step (day 2+).
 Labeled in code and README so an interviewer knows the line.

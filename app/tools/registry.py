@@ -158,6 +158,10 @@ class ToolRegistry:
         function = self.get(proposal.tool)
         if not self.spec(proposal.tool).mutating:
             raise TypeError(f"{proposal.tool} is not a mutating tool")
+        if getattr(context.datastore, "is_live_target", False):
+            raise PermissionError(
+                "Live web targets are diagnosis-only; mutation execution is forbidden"
+            )
         return function(context=context, proposal=proposal, approval_token=approval_token)
 
 

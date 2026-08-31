@@ -1,4 +1,4 @@
-.PHONY: install seed run api mcp eval eval-fixture eval-llm demo test lint verify
+.PHONY: install seed run api mcp eval eval-fixture eval-llm demo demo-live test lint verify
 
 PYTHON ?= .venv/bin/python
 
@@ -29,6 +29,11 @@ eval-llm:
 demo:
 	$(PYTHON) -m app.cli --seed checkout_v42_pool \
 	  "Checkout p95 rose to 1.8s after v42; pool timeouts are firing."
+
+demo-live:
+	$(PYTHON) -m evals.live_probe \
+	  --target $${LIVE_TARGET:-https://arjunrnair.com} \
+	  --samples $${LIVE_PROBE_SAMPLES:-3}
 
 test:
 	$(PYTHON) -m pytest

@@ -29,12 +29,17 @@ class RiskPolicy:
         tool_name: str,
         args: dict[str, Any],
         spec: ToolSpec | None = None,
+        live_target: bool = False,
     ) -> PolicyDecision:
         rendered_args = " ".join(str(value) for value in args.values())
         if tool_name in self.forbidden_tools or self.forbidden_text.search(rendered_args):
             return PolicyDecision("forbid", "Action is in the destructive forbidden set")
         if spec is None:
             return PolicyDecision("forbid", "Unknown tools fail closed")
+        if live_target and spec.mutating:
+            return PolicyDecision(
+                "forbid", "Live web targets are diagnosis-only; mutation execution is forbidden"
+            )
         if spec.mutating:
             return PolicyDecision(
                 "require-approval", f"{spec.risk}-risk mutation requires approval"

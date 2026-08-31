@@ -9,11 +9,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/status-v1-2ea44f?style=flat" alt="Status">
+  <img src="https://img.shields.io/badge/status-v2-2ea44f?style=flat" alt="Status">
   <img src="https://img.shields.io/badge/python-3.11%2B-3776ab?style=flat" alt="Python 3.11+">
   <img src="https://img.shields.io/badge/stack-FastAPI%20%7C%20MCP%20%7C%20pgvector-4b8bbe?style=flat" alt="Stack">
   <img src="https://img.shields.io/badge/unsafe--action-6.2%25%20%E2%86%92%200.0%25-2ea44f?style=flat" alt="Unsafe action rate">
-  <img src="https://img.shields.io/badge/tests-17%20passing-2ea44f?style=flat" alt="Tests">
+  <img src="https://img.shields.io/badge/tests-21%20passing-2ea44f?style=flat" alt="Tests">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey?style=flat" alt="License">
 </p>
 
@@ -22,6 +22,7 @@
   <a href="#architecture">Architecture</a> ·
   <a href="#quickstart">Quickstart</a> ·
   <a href="#tools">Tools</a> ·
+  <a href="#live-sites">Live sites</a> ·
   <a href="#evaluation">Evaluation</a> ·
   <a href="#safety">Safety</a> ·
   <a href="#how-its-different">How it's different</a> ·
@@ -75,7 +76,7 @@ control of anything destructive.
 - evidence-grounding is a first-class metric
 - mutating tools need an HMAC-signed token
 - forbidden actions refused by code, not the model
-- 15 scenarios a reviewer runs in 10 minutes
+- 16 scenarios a reviewer runs in 10 minutes
 
 </td>
 </tr>
@@ -122,6 +123,34 @@ make verify          # lint + tests + fixture eval
 
 Provider is switchable: `LLM_PROVIDER=anthropic|openai` (Anthropic primary). Config lives
 in `.env` — copy `.env.example`, never commit secrets.
+
+## Live sites
+
+Heimdall can take a one-shot synthetics snapshot of `arjunrnair.com` or
+`jobs.msemail.xyz` and investigate the resulting evidence:
+
+```bash
+make demo-live                                  # arjunrnair.com, 3 samples
+LIVE_TARGET=https://jobs.msemail.xyz make demo-live
+```
+
+The live adapter measures HTTP status, TTFB and total-latency p50/p95, response bytes,
+redirects, DNS resolution time, and TLS days remaining. It derives cited log events for
+HTTP failures, DNS failures, near-expiry TLS, high latency, and trusted cache-header
+classifications. Deployment history is returned empty because no deploy API is wired.
+
+The boundary is code-enforced:
+
+- Only the two exact HTTPS hosts above are accepted. Every request and redirect is resolved
+  and refused if any answer is private, loopback, link-local, metadata, reserved, or otherwise
+  non-public.
+- Remote page bytes are quarantined: only byte count and SHA-256 survive the adapter. They never
+  enter the agent prompt or tool plan.
+- Live investigations are diagnosis-only. The agent may return a gated proposal, but the policy
+  layer refuses every mutation against a live datastore—even after approval.
+
+Each run overwrites [`evals/RESULTS_LIVE.md`](evals/RESULTS_LIVE.md), clearly labeled as a
+non-deterministic snapshot rather than a benchmark. It does not modify either scored result file.
 
 ## Tools
 
@@ -175,6 +204,8 @@ Full tables: [`evals/RESULTS_LLM.md`](evals/RESULTS_LLM.md) · [`evals/RESULTS.m
   if the model asks. Refusal is a *passing* safety case in evals.
 - **Append-only audit log** — every outcome recorded: auto, approved, rejected, refused,
   escalated.
+- **Live-target guard** — exact allow-list and resolved-IP SSRF checks run before every live
+  request and redirect; mutation execution fails closed for live datastores.
 
 ## How it's different
 
@@ -183,7 +214,7 @@ Heimdall doesn't out-scale HolmesGPT, OpenSRE, or k8sgpt — it closes the gap t
 1. **Structured evidence grounding, scored.** Each claim ties to the exact row/line that
    backs it; the eval verifies it. Incumbents emit free text or measure only a rate.
 2. **One uniform approval gate** over *every* mutating tool — signed, fail-closed, audited.
-3. **Legible & reproducible** — 15 scenarios you run and defend in an interview, not a
+3. **Legible & reproducible** — 16 scenarios you run and defend in an interview, not a
    100-step product.
 
 The full competitive teardown (HolmesGPT · OpenSRE · k8sgpt · Aurora · IncidentFox) is in
@@ -194,7 +225,7 @@ The full competitive teardown (HolmesGPT · OpenSRE · k8sgpt · Aurora · Incid
 Honest by design (see [`LIMITATIONS.md`](LIMITATIONS.md)):
 
 - **Real:** Postgres queries, `EXPLAIN`, pg_stat_*, pgvector RAG, the policy/approval/audit
-  layer, the eval harness.
+  layer, the eval harness, and one-shot HTTPS/DNS/TLS synthetics for two allow-listed sites.
 - **Simulated:** cloud backends (K8s/Datadog/AWS) — seeded but genuinely queryable; mutating
   tools model the action rather than hitting a live cluster.
 - Live-model grounding drops on a few DB scenarios (see the per-scenario table) — a real,
@@ -203,7 +234,8 @@ Honest by design (see [`LIMITATIONS.md`](LIMITATIONS.md)):
 ## Roadmap
 
 - [ ] Multi-tenant config (per-tenant policies + backend adapters)
-- [ ] Swap a simulated backend for a real adapter (consume HolmesGPT / k8sgpt toolsets)
+- [x] Add a real, diagnosis-only live synthetics adapter with SSRF and content boundaries
+- [ ] Add authenticated telemetry/deploy adapters (consume HolmesGPT / k8sgpt toolsets)
 - [ ] Production-miss → auto-generated regression scenario loop
 - [ ] Investigator / Remediator agent split
 
