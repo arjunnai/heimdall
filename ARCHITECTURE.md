@@ -1,4 +1,4 @@
-# ARCHITECTURE — OpsPilot
+# ARCHITECTURE — Heimdall
 
 Agentic incident-response platform. An LLM agent investigates production incidents
 (distributed-system + database failures) over seeded-but-real telemetry, ties every
@@ -16,7 +16,7 @@ for the competitive landscape this design responds to.
 ## The honest wedge
 
 Two incumbents (HolmesGPT, OpenSRE) already ship an eval harness *and* a code-level
-approval gate *and* real Postgres/EXPLAIN depth. OpsPilot does **not** try to out-scale
+approval gate *and* real Postgres/EXPLAIN depth. Heimdall does **not** try to out-scale
 them. It wins on the one gap all five share, plus legibility a portfolio needs:
 
 1. **Structured evidence grounding.** Every root-cause claim carries a machine-checkable

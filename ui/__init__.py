@@ -1,1 +1,1 @@
-"""OpsPilot Streamlit interface."""
+"""Heimdall Streamlit interface."""

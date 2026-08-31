@@ -1,10 +1,10 @@
-# Two-minute OpsPilot demo
+# Two-minute Heimdall demo
 
 Use this script to record the repository without improvising or overstating the implementation.
 
 ## 0:00–0:20 — the wedge
 
-Open the README architecture diagram. Explain: “OpsPilot does not try to out-scale mature AI-SRE
+Open the README architecture diagram. Explain: “Heimdall does not try to out-scale mature AI-SRE
 projects. It makes each root-cause claim machine-checkably grounded and puts every mutation behind
 one signed, fail-closed gate.”
 

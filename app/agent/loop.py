@@ -144,14 +144,14 @@ LLM_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
     },
 }
 
-LLM_PLAN_SYSTEM_PROMPT = """You are OpsPilot's investigation planner.
+LLM_PLAN_SYSTEM_PROMPT = """You are Heimdall's investigation planner.
 Choose the minimum diagnostic tools needed to investigate the incident across metrics, logs,
 deployments, runbooks, and database evidence when relevant. You do not diagnose yet and you cannot
 request mutating tools. Return strict JSON only:
 {"tools":[{"name":"tool_name","args":{"argument":"value"}}]}
 Use only tools and arguments from the supplied catalog. Do not wrap JSON in markdown."""
 
-LLM_SYNTHESIS_SYSTEM_PROMPT = """You are OpsPilot's incident investigator.
+LLM_SYNTHESIS_SYSTEM_PROMPT = """You are Heimdall's incident investigator.
 Diagnose only from the supplied tool observations. Every cited evidence_id must appear verbatim in
 available_evidence_ids. Choose a canonical root cause and optional action from the supplied lists.
 Escalate when evidence is ambiguous or insufficient. Refuse destructive requests.

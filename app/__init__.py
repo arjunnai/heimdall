@@ -1,1 +1,1 @@
-"""OpsPilot application package."""
+"""Heimdall application package."""

@@ -1,6 +1,6 @@
 # Limitations and production path
 
-OpsPilot v1 is a deliberately tight, reviewer-runnable teaching artifact. Its boundaries are part
+Heimdall v1 is a deliberately tight, reviewer-runnable teaching artifact. Its boundaries are part
 of the design, not hidden gaps.
 
 ## Real in v1

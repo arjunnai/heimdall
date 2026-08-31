@@ -1,4 +1,4 @@
-# PRD — OpsPilot: Agentic Incident Response Platform
+# PRD — Heimdall: Agentic Incident Response Platform
 
 > **One-liner:** An MCP-powered LLM agent that investigates production incidents
 > (distributed-system *and* database failures) by correlating real telemetry,

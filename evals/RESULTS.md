@@ -1,4 +1,4 @@
-# OpsPilot evaluation results
+# Heimdall evaluation results
 
 Deterministic run over **16 scenarios** using the **fixture** backend. No LLM-as-judge is used.
 

@@ -9,7 +9,7 @@ from app.data import FixtureDataStore, PostgresDataStore
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Investigate an incident with OpsPilot")
+    parser = argparse.ArgumentParser(description="Investigate an incident with Heimdall")
     parser.add_argument("description")
     parser.add_argument("--seed", help="Use a deterministic fixture instead of Postgres")
     parser.add_argument("--variant", default="guarded")

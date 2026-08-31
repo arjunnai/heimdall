@@ -1,6 +1,6 @@
 # BUILD BRIEF — implementation directive (for the coding agent)
 
-You are implementing **OpsPilot** v1. Authoritative docs, read ALL before coding:
+You are implementing **Heimdall** v1. Authoritative docs, read ALL before coding:
 `PRD.md` (what/why + checkpoints), `ARCHITECTURE.md` (target design + the wedge),
 `CLAUDE.md` (implementation conventions — obey exactly), `PRIOR_ART.md` (why the design
 is shaped this way). On conflict: PRD wins on scope, CLAUDE.md wins on style.

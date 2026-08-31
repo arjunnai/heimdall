@@ -158,7 +158,7 @@ def render_markdown(results: dict[str, Any]) -> str:
     guarded = results["variants"]["guarded"]["metrics"]
     baseline = results["variants"]["baseline"]["metrics"]
     rows = [
-        "# OpsPilot evaluation results",
+        "# Heimdall evaluation results",
         "",
         (
             f"Deterministic run over **{results['scenario_count']} scenarios** using the "
@@ -209,7 +209,7 @@ def render_llm_markdown(results: dict[str, Any]) -> str:
     tokens = variant["token_usage"]
     model = variant["model"]
     rows = [
-        "# OpsPilot live-LLM evaluation results",
+        "# Heimdall live-LLM evaluation results",
         "",
         (
             f"Live model run over **{results['scenario_count']} scenarios** using the "
@@ -276,7 +276,7 @@ def render_llm_markdown(results: dict[str, Any]) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run OpsPilot evaluations")
+    parser = argparse.ArgumentParser(description="Run Heimdall evaluations")
     parser.add_argument("--backend", choices=("postgres", "fixture"), default="postgres")
     parser.add_argument("--variant", choices=("deterministic", "llm"), default="deterministic")
     parser.add_argument("--llm", action="store_true", help="Alias for --variant llm")

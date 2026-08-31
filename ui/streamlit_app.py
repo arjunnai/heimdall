@@ -12,7 +12,7 @@ from ui.view_model import evidence_rows, timeline_rows
 API_URL = os.getenv("OPSPILOT_API_URL", "http://localhost:8000").rstrip("/")
 
 st.set_page_config(
-    page_title="OpsPilot · Incident Control",
+    page_title="Heimdall · Incident Control",
     page_icon="◈",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -95,7 +95,7 @@ def api_get(path: str) -> dict[str, Any]:
 
 with st.sidebar:
     st.markdown('<div class="ops-kicker">System posture</div>', unsafe_allow_html=True)
-    st.title("OpsPilot")
+    st.title("Heimdall")
     st.caption("Evidence-grounded investigation with a fail-closed mutation boundary.")
     st.divider()
     seed_mode = st.toggle("Use seeded demo", value=True)

@@ -1,8 +1,8 @@
-# OpsPilot
+# Heimdall
 
 **Agentic Incident Response Platform | Python, MCP, RAG, PostgreSQL**
 
-OpsPilot investigates production incidents over real queryable telemetry, binds every root-cause
+Heimdall investigates production incidents over real queryable telemetry, binds every root-cause
 claim to exact tool-output evidence, and stops every state change at a signed human approval gate.
 In live mode, the configured LLM—not a rule matcher—chooses the diagnostic calls, reads their actual
 outputs, cites returned evidence IDs, and selects the next action under the same code policy.
@@ -49,7 +49,7 @@ escalation accuracy**, and **85.2% evidence grounding** over the same 16 fixture
 
 | Evidence-bound investigation | Human mutation boundary |
 |---|---|
-| ![OpsPilot investigation](docs/images/investigation.png) | ![Signed approval boundary](docs/images/approval-boundary.png) |
+| ![Heimdall investigation](docs/images/investigation.png) | ![Signed approval boundary](docs/images/approval-boundary.png) |
 
 The [two-minute demo script](DEMO_SCRIPT.md) gives a repeatable recording path. The UI exposes the
 investigation timeline, claim/evidence ledger, audit events, and Approve/Reject decision in one view.

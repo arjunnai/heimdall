@@ -1,4 +1,4 @@
-# OpsPilot live-LLM evaluation results
+# Heimdall live-LLM evaluation results
 
 Live model run over **16 scenarios** using the **fixture** tool backend. The investigator used **claude-sonnet-4-20250514** to select diagnostic tools and synthesize each answer. No LLM-as-judge is used; scoring remains deterministic.
 

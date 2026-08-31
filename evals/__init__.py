@@ -1,1 +1,1 @@
-"""Deterministic OpsPilot evaluation harness."""
+"""Deterministic Heimdall evaluation harness."""

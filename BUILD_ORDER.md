@@ -1,4 +1,4 @@
-# OpsPilot build order
+# Heimdall build order
 
 | Checkpoint | Deliverable | Status |
 |---|---|---|

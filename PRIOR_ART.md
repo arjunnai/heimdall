@@ -1,4 +1,4 @@
-# PRIOR ART — where OpsPilot sits in the AI-SRE landscape
+# PRIOR ART — where Heimdall sits in the AI-SRE landscape
 
 Deep-dive via firecrawl of each incumbent's real source/docs (2026-08). Knowing the
 field honestly is itself an FDE signal — including correcting a first-pass assumption.
@@ -7,7 +7,7 @@ field honestly is itself an FDE signal — including correcting a first-pass ass
 
 A surface read ("incumbents have no evals, no approval gate") is **wrong** and would
 fail in an interview. The truth: **two incumbents already ship an eval harness AND a
-code-level approval gate AND real Postgres/EXPLAIN depth.** OpsPilot must differentiate
+code-level approval gate AND real Postgres/EXPLAIN depth.** Heimdall must differentiate
 on something narrower and defensible, not on "we measure and they don't."
 
 ## The incumbents (verified)
@@ -27,16 +27,16 @@ on something narrower and defensible, not on "we measure and they don't."
 to the *exact tool-output row/line* via a machine-checkable pointer (`tool_call_id` +
 evidence id) with a confidence score, and then *scores that grounding* against a golden
 set. HolmesGPT emits free-text and its eval scores only answer *similarity*. OpenSRE
-computes a grounding *rate* but not per-claim id verification. That is OpsPilot's wedge.
+computes a grounding *rate* but not per-claim id verification. That is Heimdall's wedge.
 
-## What OpsPilot reuses (steal the good parts)
+## What Heimdall reuses (steal the good parts)
 
 - **HolmesGPT:** YAML toolset schema shape; signed-token approval; read-only DB toolset (EXPLAIN/pg_stat + row cap).
 - **OpenSRE:** deterministic eval metrics (avoid LLM-judge); confirmed-vs-unconfirmed claim split; production-miss → regression-scenario loop (day 2).
 - **k8sgpt:** its MCP server can be *consumed* as a diagnostic tool in a day-2 real adapter.
 - **Aurora:** citation-first RCA framing; separable model roles.
 
-## Where OpsPilot wins (defensible in 45 minutes)
+## Where Heimdall wins (defensible in 45 minutes)
 
 1. **Structured per-claim evidence** (`claim → evidence_id → exact row`), *scored* by the harness — the gap above.
 2. **Uniform typed approval gate** over *every* mutating tool (not one path, not paywalled, not fail-open) + signed token + reversible execution + audit trail.
@@ -44,7 +44,7 @@ computes a grounding *rate* but not per-claim id verification. That is OpsPilot'
 
 ## Interview thesis (one line)
 
-> The incumbents proved an agent can investigate and can be measured. OpsPilot closes the
+> The incumbents proved an agent can investigate and can be measured. Heimdall closes the
 > gap none of them did — every conclusion is structurally tied to the exact evidence that
 > proves it and that grounding is scored — and it makes *every* mutating action require a
 > human-signed token. I don't out-scale a Microsoft-backed CNCF project; I out-ground and

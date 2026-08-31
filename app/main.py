@@ -14,7 +14,7 @@ from app.policy import ApprovalService, ApprovalTokenManager, AuditLog, RiskPoli
 from app.tools.diagnostic import registry
 
 app = FastAPI(
-    title="OpsPilot",
+    title="Heimdall",
     version="1.0.0",
     description="Evidence-grounded, approval-gated incident response",
 )

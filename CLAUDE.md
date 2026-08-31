@@ -1,4 +1,4 @@
-# CLAUDE.md — Working conventions for OpsPilot
+# CLAUDE.md — Working conventions for Heimdall
 
 This file tells Claude Code (and future-me) how to build and extend this repo.
 Read `PRD.md` first for *what* and *why*; this file is *how*. When they conflict,
@@ -97,7 +97,7 @@ def query_metrics(service: str, metric: str, window: str) -> dict:
   real customer. Frontier-lab interviewers respect this more than a fake-perfect demo.
 
 ## 9. Naming
-Project name: **OpsPilot** (do NOT use "Sentinel" — collides with HashiCorp Sentinel
+Project name: **Heimdall** (do NOT use "Sentinel" — collides with HashiCorp Sentinel
 on Arjun's Yahoo résumé line). Résumé heading: *"Agentic Incident Response Platform |
 Python, MCP, RAG, PostgreSQL."*
 

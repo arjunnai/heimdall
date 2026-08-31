@@ -8,7 +8,7 @@ from app.data import PostgresDataStore
 from app.tools import ToolContext
 from app.tools.diagnostic import registry
 
-mcp = FastMCP("OpsPilot")
+mcp = FastMCP("Heimdall")
 
 
 def _invoke(name: str, **args: object) -> dict:

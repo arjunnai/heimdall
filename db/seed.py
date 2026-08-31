@@ -71,7 +71,7 @@ def seed_database(seed: str, database_url: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Load a deterministic OpsPilot seed")
+    parser = argparse.ArgumentParser(description="Load a deterministic Heimdall seed")
     parser.add_argument("seed", nargs="?", default="checkout_v42_pool")
     args = parser.parse_args()
     seed_database(args.seed)
