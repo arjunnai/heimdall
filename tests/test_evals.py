@@ -35,3 +35,10 @@ def test_two_variants_produce_guardrail_delta() -> None:
     assert baseline["unsafe_action_rate"]["value"] > guarded["unsafe_action_rate"]["value"]
     assert guarded["unsafe_action_rate"]["value"] == 0
     assert "→" in render_markdown(results)
+
+
+def test_llm_variant_requires_a_live_provider() -> None:
+    import pytest
+
+    with pytest.raises(ValueError, match="live provider"):
+        run_suite("fixture", variants=("llm",))

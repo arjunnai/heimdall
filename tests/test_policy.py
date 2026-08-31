@@ -80,7 +80,8 @@ def test_approve_and_reject_are_append_only(tmp_path) -> None:
     assert len((tmp_path / "audit.jsonl").read_text().splitlines()) == 2
 
 
-def test_api_stops_at_proposal_then_approves() -> None:
+def test_api_stops_at_proposal_then_approves(monkeypatch) -> None:
+    monkeypatch.setattr("app.main.settings.llm_provider", "deterministic")
     client = TestClient(app)
     investigation = client.post(
         "/investigate",

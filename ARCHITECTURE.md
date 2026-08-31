@@ -71,7 +71,7 @@ them. It wins on the one gap all five share, plus legibility a portfolio needs:
 | Component | Path | Responsibility |
 |-----------|------|----------------|
 | API | `app/main.py` | FastAPI: `/investigate`, `/approve`, `/audit` |
-| Agent loop | `app/agent/` | plan → call tool → observe → correlate → hypothesis + confidence + risk, tracking a hypothesis set across iterations (not pure tool-call-until-stop). Provider abstraction (`provider.py`) switches Anthropic↔OpenAI via `LLM_PROVIDER` |
+| Agent loop | `app/agent/` | Deterministic regression path plus a live provider path: model plans typed diagnostics → code validates/executes → model synthesizes only over returned evidence IDs → code validates citations/actions. `provider.py` switches Anthropic↔OpenAI and supports `ANTHROPIC_BASE_URL` |
 | Tools | `app/tools/` | MCP tools, typed. `@tool(mutating=, risk=)`. Diagnostic hit Postgres for real; mutating return proposals. YAML/decorator schema modeled on HolmesGPT's toolset shape (familiar to reviewers) + our `mutating`/`risk`/`evidence_ids` fields |
 | RAG | `app/rag/` | chunk → embed → pgvector search; returns chunks with source ids |
 | Policy | `app/policy/` | risk policy (auto \| require-approval \| forbid), **signed approval tokens** (HMAC over tool_call_id + name + args_hash, short TTL), reversible execution, append-only audit log |
@@ -134,6 +134,10 @@ IncidentFox and HolmesGPT rely on and can't reproduce exactly):
 Runs the suite across ≥2 model/prompt variants → the before/after guardrail X→Y number.
 Day-2 borrow from OpenSRE: a production-miss → new-regression-scenario loop, so the suite
 grows from real failures instead of staying static.
+
+CP6 adds a separate `llm` variant over the same scenarios and scorer. It does not receive expected
+root causes, chooses its own diagnostic calls, records actual model/token usage, and writes
+`results_llm.json` / `RESULTS_LLM.md` without overwriting the deterministic regression artifacts.
 
 ## Determinism
 

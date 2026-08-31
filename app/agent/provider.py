@@ -29,7 +29,10 @@ class AnthropicProvider(LLMProvider):
             raise ValueError("ANTHROPIC_API_KEY is required for the Anthropic provider")
         from anthropic import Anthropic
 
-        self.client = Anthropic(api_key=settings.anthropic_api_key)
+        self.client = Anthropic(
+            api_key=settings.anthropic_api_key,
+            base_url=settings.anthropic_base_url or None,
+        )
         self.model = settings.anthropic_model
 
     def complete(
@@ -46,7 +49,7 @@ class AnthropicProvider(LLMProvider):
         )
         return ProviderResponse(
             content="".join(block.text for block in response.content if block.type == "text"),
-            model=self.model,
+            model=response.model,
             input_tokens=response.usage.input_tokens,
             output_tokens=response.usage.output_tokens,
         )

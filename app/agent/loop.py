@@ -8,6 +8,7 @@ from typing import Any
 import app.tools.mutating  # noqa: F401  # Register the gated mutation surface.
 from app.agent.provider import LLMProvider
 from app.models import ActionProposal, Claim, EvidenceRef, InvestigationResult
+from app.policy import RiskPolicy
 from app.tools import ToolContext
 from app.tools.diagnostic import registry
 
@@ -78,6 +79,87 @@ KNOWN_SERVICES = (
     "database",
 )
 
+ROOT_CAUSE_TAXONOMY = (
+    "database_connection_pool_exhaustion",
+    "missing_database_index",
+    "service_memory_leak",
+    "kafka_consumer_lag",
+    "upstream_dependency_outage",
+    "traffic_spike",
+    "dns_service_discovery_failure",
+    "false_positive_alert",
+    "stale_database_statistics",
+    "database_lock_contention",
+    "database_hotspot",
+    "expensive_wildcard_query",
+    "unsafe_request_refused",
+    "schema_validation_error",
+    "insufficient_or_ambiguous_evidence",
+    "index_already_exists_noop",
+)
+
+ACTION_TAXONOMY = (
+    "rollback_deployment",
+    "increase_connection_pool",
+    "create_index",
+    "restart_service",
+    "request_approval",
+)
+
+LLM_TOOL_SCHEMAS: dict[str, dict[str, Any]] = {
+    "query_metrics": {
+        "required": ["service", "metric"],
+        "optional": {"window": "24h"},
+        "description": "Query timestamped service metrics. Use metric='*' to inspect all metrics.",
+    },
+    "get_recent_deployments": {
+        "required": ["service"],
+        "optional": {"window": "7d"},
+        "description": "Get recent deployment versions and timestamps for a service.",
+    },
+    "inspect_logs": {
+        "required": ["service"],
+        "optional": {"severity": None, "window": "24h", "contains": None},
+        "description": "Inspect structured service logs with optional severity/text filters.",
+    },
+    "search_runbooks": {
+        "required": ["query"],
+        "optional": {"limit": 3},
+        "description": "Retrieve runbook chunks relevant to the incident.",
+    },
+    "explain_query": {
+        "required": ["sql"],
+        "optional": {},
+        "description": "Run read-only EXPLAIN (FORMAT JSON) for a SQL query.",
+    },
+    "get_table_stats": {
+        "required": ["table"],
+        "optional": {},
+        "description": "Read pg_stat_user_tables row/dead-tuple/analyze statistics.",
+    },
+    "get_index_stats": {
+        "required": ["table"],
+        "optional": {},
+        "description": "Read existing PostgreSQL index definitions and usage.",
+    },
+}
+
+LLM_PLAN_SYSTEM_PROMPT = """You are OpsPilot's investigation planner.
+Choose the minimum diagnostic tools needed to investigate the incident across metrics, logs,
+deployments, runbooks, and database evidence when relevant. You do not diagnose yet and you cannot
+request mutating tools. Return strict JSON only:
+{"tools":[{"name":"tool_name","args":{"argument":"value"}}]}
+Use only tools and arguments from the supplied catalog. Do not wrap JSON in markdown."""
+
+LLM_SYNTHESIS_SYSTEM_PROMPT = """You are OpsPilot's incident investigator.
+Diagnose only from the supplied tool observations. Every cited evidence_id must appear verbatim in
+available_evidence_ids. Choose a canonical root cause and optional action from the supplied lists.
+Escalate when evidence is ambiguous or insufficient. Refuse destructive requests.
+Return strict JSON:
+{"root_cause":"canonical_name","summary":"one evidence-based sentence","confidence":0.0,
+"evidence_ids":["exact:id"],"action":null,"escalated":false,"refused":false}
+Do not wrap JSON in markdown and never invent evidence, services, tables, columns, or actions."""
+
 
 class IncidentAgent:
     """A bounded plan→call→observe→correlate loop with structural citations."""
@@ -113,6 +195,11 @@ class IncidentAgent:
         return registry.invoke(tool_name, self.context, **args)
 
     def investigate(self, description: str) -> InvestigationResult:
+        if self.provider is not None:
+            return self._investigate_llm(description)
+        return self._investigate_deterministic(description)
+
+    def _investigate_deterministic(self, description: str) -> InvestigationResult:
         service = self._service(description, self.context.datastore)
         metrics = self._call("query_metrics", service=service, metric="*", window="24h")
         deployments = self._call("get_recent_deployments", service=service, window="7d")
@@ -213,33 +300,6 @@ class IncidentAgent:
         action = rule.action
         confidence = 0.93
         selected_evidence = all_evidence
-        if self.provider:
-            try:
-                candidate = self._provider_candidate(
-                    description=description,
-                    service=service,
-                    allowed_root_cause=rule.root_cause,
-                    allowed_action=rule.action,
-                    evidence_ids=all_evidence,
-                    observations={
-                        "metrics": metrics.get("rows", []),
-                        "deployments": deployments.get("rows", []),
-                        "logs": logs.get("rows", []),
-                        "runbooks": runbooks.get("rows", []),
-                    },
-                )
-                action = candidate.get("action")
-                confidence = float(candidate["confidence"])
-                selected_evidence = candidate["evidence_ids"]
-            except (KeyError, TypeError, ValueError, json.JSONDecodeError):
-                return self._result(
-                    description,
-                    "provider_output_unverified",
-                    "The model output failed structural validation; human escalation is required.",
-                    0.2,
-                    all_evidence,
-                    escalated=True,
-                )
         proposal = None
         if action:
             args = self._action_args(action, service)
@@ -260,61 +320,229 @@ class IncidentAgent:
             escalated=rule.risk == "high" and proposal is None,
         )
 
-    def _provider_candidate(
-        self,
-        *,
-        description: str,
-        service: str,
-        allowed_root_cause: str,
-        allowed_action: str | None,
-        evidence_ids: list[str],
-        observations: dict[str, Any],
-    ) -> dict[str, Any]:
+    def _investigate_llm(self, description: str) -> InvestigationResult:
+        """Let a live provider plan tools and synthesize a structurally validated diagnosis."""
         assert self.provider is not None
-        response = self.provider.complete(
-            [
-                {
-                    "role": "system",
-                    "content": (
-                        "Correlate incident evidence. Return JSON only with root_cause, "
-                        "confidence (0..1), action (string or null), and evidence_ids. "
-                        "Use only the supplied evidence IDs; never invent schema or evidence."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": json.dumps(
-                        {
-                            "incident": description,
-                            "service": service,
-                            "allowed_root_cause": allowed_root_cause,
-                            "allowed_action": allowed_action,
-                            "available_evidence_ids": evidence_ids,
-                            "observations": observations,
-                        },
-                        default=str,
-                    ),
-                },
-            ],
-            temperature=0,
+        service_hint = self._service(description, self.context.datastore)
+        try:
+            planning_response = self.provider.complete(
+                [
+                    {"role": "system", "content": LLM_PLAN_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "incident": description,
+                                "service_hint": service_hint,
+                                "diagnostic_tool_catalog": LLM_TOOL_SCHEMAS,
+                            }
+                        ),
+                    },
+                ],
+                temperature=0,
+            )
+            self._record_provider_response(planning_response)
+            plan = self._parse_provider_json(planning_response.content)
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return self._unverified_provider_result(
+                description, "The model did not return a valid diagnostic tool plan."
+            )
+
+        observations: list[dict[str, Any]] = []
+        planned_calls = plan.get("tools")
+        if not isinstance(planned_calls, list):
+            return self._unverified_provider_result(
+                description, "The model tool plan omitted the tools list."
+            )
+        for planned_call in planned_calls[:10]:
+            validated = self._validated_planned_call(planned_call)
+            if validated is None:
+                continue
+            tool_name, args = validated
+            try:
+                result = self._call(tool_name, **args)
+                observations.append({"tool": tool_name, "args": args, "result": result})
+            except (KeyError, TypeError, ValueError, PermissionError) as exc:
+                observations.append(
+                    {"tool": tool_name, "args": args, "error": f"{type(exc).__name__}: {exc}"}
+                )
+
+        available_evidence_ids = list(
+            dict.fromkeys(
+                evidence_id for call in self.context.trace for evidence_id in call.evidence_ids
+            )
         )
-        candidate = json.loads(response.content)
-        self.provider_model = response.model
-        self.token_usage = {
-            "input_tokens": response.input_tokens,
-            "output_tokens": response.output_tokens,
-        }
-        if candidate.get("root_cause") != allowed_root_cause:
-            raise ValueError("Provider root cause is not supported by deterministic evidence")
-        if candidate.get("action") not in {None, allowed_action}:
-            raise ValueError("Provider action is outside the bounded action set")
+        try:
+            synthesis_response = self.provider.complete(
+                [
+                    {"role": "system", "content": LLM_SYNTHESIS_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "incident": description,
+                                "canonical_root_causes": ROOT_CAUSE_TAXONOMY,
+                                "allowed_actions": ACTION_TAXONOMY,
+                                "available_evidence_ids": available_evidence_ids,
+                                "tool_observations": observations,
+                            },
+                            default=str,
+                        ),
+                    },
+                ],
+                temperature=0,
+            )
+            self._record_provider_response(synthesis_response)
+            candidate = self._parse_provider_json(synthesis_response.content)
+            self._validate_llm_candidate(candidate, available_evidence_ids)
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return self._unverified_provider_result(
+                description,
+                "The model diagnosis failed the structured evidence contract.",
+            )
+
+        root_cause = str(candidate["root_cause"])
+        summary = str(candidate["summary"])
+        confidence = float(candidate["confidence"])
+        selected_evidence = list(candidate["evidence_ids"])
+        action = candidate.get("action")
+        escalated = bool(candidate["escalated"])
+        refused = bool(candidate["refused"])
+        refusal_reason = None
+        attempted_actions: list[str] = []
+        proposal = None
+
+        policy = RiskPolicy()
+        destructive_request = bool(policy.forbidden_text.search(description))
+        if action:
+            attempted_actions.append(str(action))
+            spec = None
+            if action in ACTION_TAXONOMY:
+                try:
+                    spec = registry.spec(str(action))
+                except KeyError:
+                    spec = None
+            action_args = self._action_args(str(action), service_hint)
+            decision = policy.decide(tool_name=str(action), args=action_args, spec=spec)
+            if decision.decision == "forbid":
+                refused = True
+                refusal_reason = decision.reason
+                root_cause = "unsafe_request_refused"
+                action = None
+            elif decision.decision == "require-approval":
+                proposal = registry.propose(
+                    str(action),
+                    rationale=summary,
+                    evidence=self._refs(selected_evidence),
+                    **action_args,
+                )
+        if destructive_request:
+            refused = True
+            refusal_reason = "Forbidden destructive request matched the code policy"
+            root_cause = "unsafe_request_refused"
+            proposal = None
+        if refused:
+            escalated = False
+
+        return self._result(
+            description,
+            root_cause,
+            summary,
+            confidence,
+            selected_evidence,
+            proposal=proposal,
+            escalated=escalated,
+            refused=refused,
+            refusal_reason=refusal_reason,
+            attempted_actions=attempted_actions,
+        )
+
+    def _validated_planned_call(self, planned_call: Any) -> tuple[str, dict[str, Any]] | None:
+        if not isinstance(planned_call, dict):
+            return None
+        name = planned_call.get("name")
+        args = planned_call.get("args")
+        if name not in LLM_TOOL_SCHEMAS or not isinstance(args, dict):
+            return None
+        schema = LLM_TOOL_SCHEMAS[name]
+        allowed = set(schema["required"]) | set(schema["optional"])
+        if set(args) - allowed or any(key not in args for key in schema["required"]):
+            return None
+        normalized = {**schema["optional"], **args}
+        if any(
+            not isinstance(normalized[key], str) or not normalized[key].strip()
+            for key in schema["required"]
+        ):
+            return None
+        if name == "search_runbooks":
+            limit = normalized.get("limit", 3)
+            if not isinstance(limit, int) or isinstance(limit, bool):
+                return None
+            normalized["limit"] = min(max(limit, 1), 8)
+        return str(name), normalized
+
+    def _validate_llm_candidate(
+        self, candidate: dict[str, Any], available_evidence_ids: list[str]
+    ) -> None:
+        if candidate.get("root_cause") not in ROOT_CAUSE_TAXONOMY:
+            raise ValueError("Model returned a non-canonical root cause")
+        if not isinstance(candidate.get("summary"), str) or not candidate["summary"].strip():
+            raise ValueError("Model summary is missing")
         confidence = float(candidate["confidence"])
         if not 0 <= confidence <= 1:
-            raise ValueError("Provider confidence is outside 0..1")
-        cited = candidate.get("evidence_ids")
-        if not isinstance(cited, list) or not cited or not set(cited) <= set(evidence_ids):
-            raise ValueError("Provider cited unavailable evidence")
-        return candidate
+            raise ValueError("Model confidence is outside 0..1")
+        evidence_ids = candidate.get("evidence_ids")
+        if not isinstance(evidence_ids, list) or not all(
+            isinstance(evidence_id, str) for evidence_id in evidence_ids
+        ):
+            raise ValueError("Model evidence_ids must be a string list")
+        if available_evidence_ids and not evidence_ids:
+            raise ValueError("Model omitted citations despite available evidence")
+        if not set(evidence_ids) <= set(available_evidence_ids):
+            raise ValueError("Model cited evidence not returned by its tool calls")
+        action = candidate.get("action")
+        if action is not None and not isinstance(action, str):
+            raise ValueError("Model action must be a string or null")
+        if not isinstance(candidate.get("escalated"), bool) or not isinstance(
+            candidate.get("refused"), bool
+        ):
+            raise ValueError("Model escalation/refusal flags must be booleans")
+
+    def _record_provider_response(self, response: Any) -> None:
+        self.provider_model = response.model
+        self.token_usage = {
+            "input_tokens": self.token_usage.get("input_tokens", 0) + response.input_tokens,
+            "output_tokens": self.token_usage.get("output_tokens", 0) + response.output_tokens,
+            "provider_calls": self.token_usage.get("provider_calls", 0) + 1,
+        }
+
+    @staticmethod
+    def _parse_provider_json(content: str) -> dict[str, Any]:
+        rendered = content.strip()
+        if rendered.startswith("```"):
+            rendered = rendered.split("\n", 1)[-1]
+            rendered = rendered.rsplit("```", 1)[0].strip()
+        try:
+            parsed = json.loads(rendered)
+        except json.JSONDecodeError:
+            start = rendered.find("{")
+            end = rendered.rfind("}")
+            if start < 0 or end <= start:
+                raise
+            parsed = json.loads(rendered[start : end + 1])
+        if not isinstance(parsed, dict):
+            raise ValueError("Provider response must be a JSON object")
+        return parsed
+
+    def _unverified_provider_result(self, description: str, reason: str) -> InvestigationResult:
+        return self._result(
+            description,
+            "provider_output_unverified",
+            reason,
+            0.0,
+            [],
+            escalated=True,
+        )
 
     @staticmethod
     def _action_args(action: str, service: str) -> dict[str, Any]:

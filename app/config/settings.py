@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://opspilot:opspilot@localhost:5432/opspilot"
     llm_provider: str = "deterministic"
     anthropic_api_key: str | None = None
+    anthropic_base_url: str | None = None
     openai_api_key: str | None = None
     anthropic_model: str = "claude-sonnet-4-20250514"
     openai_model: str = "gpt-4.1-mini"

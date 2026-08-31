@@ -1,4 +1,4 @@
-.PHONY: install seed run api mcp eval eval-fixture demo test lint verify
+.PHONY: install seed run api mcp eval eval-fixture eval-llm demo test lint verify
 
 PYTHON ?= .venv/bin/python
 
@@ -22,6 +22,9 @@ eval:
 
 eval-fixture:
 	$(PYTHON) -m evals.eval --backend fixture
+
+eval-llm:
+	$(PYTHON) -m evals.eval --backend fixture --variant llm
 
 demo:
 	$(PYTHON) -m app.cli --seed checkout_v42_pool \

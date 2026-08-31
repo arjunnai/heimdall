@@ -22,6 +22,7 @@ services:
       DATABASE_URL: postgresql://opspilot:opspilot@postgres:5432/opspilot
       LLM_PROVIDER: ${LLM_PROVIDER:-deterministic}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       APPROVAL_SECRET: ${APPROVAL_SECRET:-development-only-secret-change-me-now}
       AUDIT_LOG_PATH: /workspace/audit/events.jsonl
@@ -48,4 +49,3 @@ services:
 
 volumes:
   postgres_data:
-

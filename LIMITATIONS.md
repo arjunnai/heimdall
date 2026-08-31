@@ -34,6 +34,7 @@ of the design, not hidden gaps.
 6. Run fault-injection and frozen production regressions against each customer integration.
 7. Add tracing for model tokens/latency and redact sensitive evidence before model calls.
 
-The deterministic suite proves behavior on its frozen incidents. It does not establish reliability
-on unseen incidents, replace an SRE, or justify autonomous remediation.
-
+The deterministic suite proves behavior on its frozen incidents. The separate live-LLM run proves
+that a configured model selected tools and produced structurally verified citations on one run; its
+non-perfect tool, escalation, and grounding metrics are retained. Neither establishes reliability
+on unseen incidents, replaces an SRE, or justifies autonomous remediation.
